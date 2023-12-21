@@ -1,7 +1,32 @@
+# HIKROBOTICS工业相机ROS非官方驱动
+
+海康机器人工业相机ROS驱动包，包含海康MVS-SDK v2.1.2静态库。支持参数化配置，支持关闭自动曝光时通过ROS-topic配置曝光时间。
+
+## Install
+
+```bash
+
+mkdir -p ~/hikrobotics_camera_ws/src
+git clone https://github.com/gloryhry/HIKRobotics-Camera-ROS-Driver.git ~/hikrobotics_camera_ws/src/hik_camera_driver
+cd ~/hikrobotics_camera_ws
+catkin_make
+```
+
+## Launch run
+
+```bash
+source ./devel/setup.bash
+roslaunch hik_camera_driver camera.launch
+```
+
+## Params
+
+```yaml
+# 相机名称
 camera_name: camera
 Camera:
   # 相机序列号
-  serial_number: 00DA1999130
+  serial_number: xxxxxxxxxxx
   # 相机内参文件 package://my_cameras/calibrations/${NAME}.yaml
   cam_info_url: package://hik_camera_driver/config/ost.yaml
   # 帧率
@@ -59,4 +84,7 @@ Camera:
   # 伽马调节
   Gamma_value: 1.0
   # Gamma 选择
+  # 1:User
+  # 2:sRGB
   Gamma_selector: 1
+```

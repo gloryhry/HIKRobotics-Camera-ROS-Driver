@@ -15,6 +15,7 @@ namespace HIKCAMERA
         image_transport::ImageTransport it(nh);
         cinfo_.reset(new camera_info_manager::CameraInfoManager(nh, camera_name, cam_info_url));
         camera_pub = it.advertiseCamera(camera_name + "/image", 1);
+        exposure_sub = nh.subscribe<std_msgs::Float32>(camera_name + "/set_exposure", 10, boost::bind(&Hik_camera_base::exposure_callback, this, _1));
     }
 
     bool Hik_camera_base::set_params()
@@ -52,6 +53,9 @@ namespace HIKCAMERA
         private_nh.param<bool>("Camera/GammaEnable", Gamma, false);
         private_nh.param<float>("Camera/Gamma_value", Gamma_value, 1.0);
         private_nh.param<int>("Camera/Gamma_selector", Gamma_selector, 1);
+
+        // Exposure_low_time = ExposureTimeLow;
+        // Exposure_up_time = ExposureTimeUp;
 
         setEnumValue("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS);
         ROS_INFO_STREAM("AcquisitionMode set to Continuous.");
@@ -426,6 +430,38 @@ namespace HIKCAMERA
         printf("MV_CC_DestroyHandle succeed.\n");
     }
 
+    bool Hik_camera_base::changeExposureTime(float value)
+    {
+        // 停止取流
+        nRet = MV_CC_StopGrabbing(m_handle);
+        if (MV_OK != nRet)
+        {
+            printf("MV_CC_StopGrabbing fail! nRet [%x]\n", nRet);
+            return false;
+        }
+        // 更改曝光速度
+        setFloatValue("ExposureTime", value);
+        // 开始取流
+        nRet = MV_CC_StartGrabbing(m_handle);
+        if (MV_OK != nRet)
+        {
+            ROS_ERROR("MV_CC_StartGrabbing fail! nRet [%x]\n", nRet);
+            return false;
+        }
+        return true;
+    }
+
+    void Hik_camera_base::exposure_callback(const std_msgs::Float32ConstPtr msg)
+    {
+        float exposure = msg->data;
+        float get_exposure;
+        getFloatValue("ExposureTime", get_exposure);
+        if (get_exposure != exposure)
+        {
+            changeExposureTime(exposure);
+        }
+    }
+
     void *Hik_camera_base::WorkThread(void *p_handle)
     {
         int nRet = MV_OK;
@@ -449,7 +485,7 @@ namespace HIKCAMERA
         unsigned int nDataSize = stParam.nCurValue;
         while (ros::ok())
         {
-            nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 10);
+            nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 50);
             if (nRet == MV_OK)
             {
                 ros::Time rcv_time = ros::Time::now();

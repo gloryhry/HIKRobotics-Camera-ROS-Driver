@@ -10,6 +10,7 @@
 #include <camera_info_manager/camera_info_manager.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
+#include <std_msgs/Float32.h>
 
 namespace HIKCAMERA
 {
@@ -42,6 +43,9 @@ namespace HIKCAMERA
         void stopStream();
         static void *WorkThread(void *p_handle);
 
+        bool changeExposureTime(float value);
+        void exposure_callback(const std_msgs::Float32ConstPtr msg);
+
     public:
         int nRet = -1;
         void *m_handle = NULL;
@@ -51,6 +55,7 @@ namespace HIKCAMERA
         ros::NodeHandle private_nh;
         boost::shared_ptr<camera_info_manager::CameraInfoManager> cinfo_;
         image_transport::CameraPublisher camera_pub;
+        ros::Subscriber exposure_sub;
     };
 
 } // namespace HIKCAMERA
