@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="hik_camera_driver" name="camera_driver" type="camera_driver" output="screen">
+        <rosparam file="$(find hik_camera_driver)/config/camera.yaml" command="load"/>
+    </node>
+</launch>

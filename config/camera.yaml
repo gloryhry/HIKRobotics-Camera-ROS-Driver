@@ -1,0 +1,62 @@
+camera_name: camera
+Camera:
+  # 相机序列号
+  serial_number: 00DA1999130
+  # 相机内参文件 package://my_cameras/calibrations/${NAME}.yaml
+  cam_info_url: package://hik_camera_driver/config/ost.yaml
+  # 帧率
+  frame_rate: 10.0
+
+  # 触发模式
+  Trigger: false
+  # 触发源
+  # 0:Line0
+  # 1:Line1
+  # 2:Line2
+  # 3.Line3
+  # 4:Counter0
+  # 7:Software
+  # 8:FrequencyConverter
+  Tigger_line: 2
+  # 触发上升沿、下降沿、高电平、低电平等
+  # 0:RisingEdge
+  # 1:FallingEdge
+  # 2:LevelHigh
+  # 3:LevelLow
+  Trigger_action: 0
+  # 触发延时 ≥0.0 ，单位 us
+  Trigger_delay: 0.0
+
+  # 自动曝光
+  # 0:Off
+  # 1:Once
+  # 2:Continuous
+  Exposure: 2
+  # 曝光时间 ≥0.0 ，单位 us
+  Exposure_time: 10000.0
+  # 自动曝光时间上限
+  ExposureTimeUp: 10000
+  # 自动曝光时间下限
+  ExposureTimeLow: 100
+
+  # 自动增益
+  # 0:Off
+  # 1:Once
+  # 2:Continuous
+  Gain_mode: 2
+  # 增益值 ≥0.0 ，单位 dB
+  Gain_value: 0.0
+
+  # 数字偏移使能
+  Digital_shift_mode: true
+  # 数字偏移调节 ≥ 0.0 
+  Digital_shift: 3.0
+  # 亮度 0 <= L <= 255
+  brightneess: 80
+
+  # Gamma 使能
+  GammaEnable: true
+  # 伽马调节
+  Gamma_value: 1.0
+  # Gamma 选择
+  Gamma_selector: 1
