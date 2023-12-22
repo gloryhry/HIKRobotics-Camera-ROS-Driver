@@ -5,6 +5,8 @@ namespace HIKCAMERA
     sensor_msgs::ImagePtr frame; // 临时存放当前帧
     pthread_mutex_t mutex;       // 存放帧的锁
     bool frame_empty = true;     // 用于标志是否有新帧未发布
+    float exposure_time_set;     // 用于存放下次设置的曝光时间
+    int exposure_auto;           // 是否自动曝光
 
     Hik_camera_base::Hik_camera_base(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
     {
@@ -53,9 +55,12 @@ namespace HIKCAMERA
         private_nh.param<bool>("Camera/GammaEnable", Gamma, false);
         private_nh.param<float>("Camera/Gamma_value", Gamma_value, 1.0);
         private_nh.param<int>("Camera/Gamma_selector", Gamma_selector, 1);
+        private_nh.param<bool>("Camera/Exposure_control", exposure_control, false);
 
-        // Exposure_low_time = ExposureTimeLow;
-        // Exposure_up_time = ExposureTimeUp;
+        exposure_time_set = Exposure_time;
+        exposure_auto = Exposure;
+        exposure_time_low = ExposureTimeLow;
+        exposure_time_up = ExposureTimeUp;
 
         setEnumValue("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS);
         ROS_INFO_STREAM("AcquisitionMode set to Continuous.");
@@ -121,7 +126,7 @@ namespace HIKCAMERA
         else
         {
             ROS_ERROR_STREAM("Not Exist Exposure Mode: " << Exposure);
-            return EXIT_FAILURE;
+            return false;
         }
         // 设置Gain
         if (Gain_mode == 0)
@@ -139,7 +144,7 @@ namespace HIKCAMERA
         else
         {
             ROS_ERROR_STREAM("Not Exist Gain Mode: " << Gain_mode);
-            return EXIT_FAILURE;
+            return false;
         }
         // 设置白平衡
         setEnumValue("BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_CONTINUOUS);
@@ -197,6 +202,7 @@ namespace HIKCAMERA
         //         ROS_ERROR_STREAM("Not Exist Gamma Selector Mode: " << Gamma_selector);
         //     }
         // }
+        return true;
     }
 
     bool Hik_camera_base::set_camera(MV_CC_DEVICE_INFO &camera)
@@ -458,7 +464,8 @@ namespace HIKCAMERA
         getFloatValue("ExposureTime", get_exposure);
         if (get_exposure != exposure)
         {
-            changeExposureTime(exposure);
+            // changeExposureTime(exposure);
+            exposure_time_set = exposure;
         }
     }
 
@@ -485,11 +492,20 @@ namespace HIKCAMERA
         unsigned int nDataSize = stParam.nCurValue;
         while (ros::ok())
         {
+            if (exposure_auto == 0)
+            {
+                // 设置曝光
+                nRet = MV_CC_SetExposureTime(p_handle, exposure_time_set);
+                if (MV_OK != nRet)
+                {
+                    ROS_WARN("Exposure time set failed! nRet [%x]\n", nRet);
+                }
+            }
             nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 50);
             if (nRet == MV_OK)
             {
                 ros::Time rcv_time = ros::Time::now();
-                std::string debug_msg;
+                // std::string debug_msg;
                 // ROS_INFO_STREAM("GetOneFrame,nFrameNum[" << stImageInfo.nFrameNum << "],FrameTime:" + std::to_string(rcv_time.toSec()));
                 stConvertParam.nWidth = stImageInfo.nWidth;
                 stConvertParam.nHeight = stImageInfo.nHeight;
@@ -521,6 +537,7 @@ namespace HIKCAMERA
             free(m_pBufForSaveImage);
             m_pBufForSaveImage = NULL;
         }
+        return NULL;
     }
 
     void Hik_camera_base::ImagePub()
@@ -534,6 +551,25 @@ namespace HIKCAMERA
             ci_->header.stamp = frame->header.stamp;
             camera_pub.publish(*frame, *ci_);
             frame_empty = true;
+
+            if (exposure_control)
+            {
+                cv_bridge::CvImagePtr cv_ptr;
+                cv_ptr = cv_bridge::toCvCopy(frame, sensor_msgs::image_encodings::BGR8);
+                cv::Mat temp_img = cv_ptr->image;
+                cv::Mat imgGray;
+                cv::cvtColor(temp_img, imgGray, CV_BGR2GRAY);
+                cv::Scalar grayScalar = cv::mean(imgGray);
+                float imgGrayLight = grayScalar.val[0];
+                if (imgGrayLight < 90 && exposure_time_set * scale < exposure_time_up)
+                {
+                    exposure_time_set *= scale;
+                }
+                else if (imgGrayLight > 110 && exposure_time_set / scale > exposure_time_low)
+                {
+                    exposure_time_set /= scale;
+                }
+            }
         }
         pthread_mutex_unlock(&mutex);
     }

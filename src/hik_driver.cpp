@@ -87,7 +87,7 @@ int main(int argc, char **argv)
     cameras = get_all_camera();
     if (cameras.size() == 0)
     {
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 
     std::string serial_number;
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
         if (!flag)
         {
             ROS_ERROR_STREAM("Can Not Find Camera: " << serial_number);
-            return EXIT_FAILURE;
+            return EXIT_SUCCESS;
         }
     }
     camera.set_params();

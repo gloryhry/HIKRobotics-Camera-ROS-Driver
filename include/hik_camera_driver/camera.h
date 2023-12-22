@@ -17,7 +17,9 @@ namespace HIKCAMERA
     // cv::Mat frame;            // 临时存放当前帧
     extern sensor_msgs::ImagePtr frame; // 临时存放当前帧
     extern pthread_mutex_t mutex;       // 存放帧的锁
-    extern bool frame_empty;    // 用于标志是否有新帧未发布
+    extern bool frame_empty;            // 用于标志是否有新帧未发布
+    extern float exposure_time_set;     // 用于存放下次设置的曝光时间
+    extern int exposure_auto;          // 是否自动曝光
 
     class Hik_camera_base
     {
@@ -56,6 +58,9 @@ namespace HIKCAMERA
         boost::shared_ptr<camera_info_manager::CameraInfoManager> cinfo_;
         image_transport::CameraPublisher camera_pub;
         ros::Subscriber exposure_sub;
+        bool exposure_control = false;             // 程序控制曝光（当外部触发,无法使用自动曝光时启用）
+        float exposure_time_up, exposure_time_low; // 曝光时间上下限
+        float scale = 1.03;                        // 曝光时间变化率
     };
 
 } // namespace HIKCAMERA
