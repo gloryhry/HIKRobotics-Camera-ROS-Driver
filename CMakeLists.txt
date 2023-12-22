@@ -183,6 +183,27 @@ target_link_libraries(camera_driver
 ## Install ##
 #############
 
+install(TARGETS camera_driver
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+# install(TARGETS camera_driver
+#         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#         RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+
+install(DIRECTORY include/
+        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY launch/
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch)
+
+install(DIRECTORY config/
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config)
+
+install(DIRECTORY libs/
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/libs)
+
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
 

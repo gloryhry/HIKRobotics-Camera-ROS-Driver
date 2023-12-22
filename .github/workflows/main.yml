@@ -1,4 +1,4 @@
-name: ROS Build
+name: ROS Noetic
 
 on:
   push:
@@ -41,10 +41,10 @@ jobs:
         run: |
             source /opt/ros/$ROS_DISTRO/setup.bash
             cd ~/catkin_ws
-            catkin config --install --cmake-args -DCMAKE_BUILD_TYPE=Release
+            catkin config --install 
+            # --cmake-args -DCMAKE_BUILD_TYPE=Release
             catkin build --no-status
             source devel/setup.bash
-            zip -q -r ~/hik_camera_driver.zip ~/catkin_ws
       - name: lint
         run: |
             cd ~/catkin_ws
@@ -62,4 +62,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: hik_camera_driver
-          path: ~/hik_camera_driver.zip
+          path: ~/catkin_ws/install
