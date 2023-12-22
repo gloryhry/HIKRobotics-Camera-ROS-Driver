@@ -61,6 +61,7 @@ namespace HIKCAMERA
         bool exposure_control = false;             // 程序控制曝光（当外部触发,无法使用自动曝光时启用）
         float exposure_time_up, exposure_time_low; // 曝光时间上下限
         float scale = 1.03;                        // 曝光时间变化率
+        float light_set;                           // 控制曝光指定亮度
     };
 
 } // namespace HIKCAMERA

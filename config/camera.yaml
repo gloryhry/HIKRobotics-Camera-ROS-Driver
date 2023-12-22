@@ -54,7 +54,7 @@ Camera:
   # 数字偏移调节 ≥ 0.0 
   Digital_shift: 3.0
   # 亮度 0 <= L <= 255
-  brightneess: 80
+  brightneess: 100
 
   # Gamma 使能
   GammaEnable: true

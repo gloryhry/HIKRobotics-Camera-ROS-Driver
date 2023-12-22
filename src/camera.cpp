@@ -61,6 +61,7 @@ namespace HIKCAMERA
         exposure_auto = Exposure;
         exposure_time_low = ExposureTimeLow;
         exposure_time_up = ExposureTimeUp;
+        light_set = brightneess;
 
         setEnumValue("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS);
         ROS_INFO_STREAM("AcquisitionMode set to Continuous.");
@@ -561,11 +562,11 @@ namespace HIKCAMERA
                 cv::cvtColor(temp_img, imgGray, CV_BGR2GRAY);
                 cv::Scalar grayScalar = cv::mean(imgGray);
                 float imgGrayLight = grayScalar.val[0];
-                if (imgGrayLight < 90 && exposure_time_set * scale < exposure_time_up)
+                if (imgGrayLight < light_set - 10 && exposure_time_set * scale < exposure_time_up)
                 {
                     exposure_time_set *= scale;
                 }
-                else if (imgGrayLight > 110 && exposure_time_set / scale > exposure_time_low)
+                else if (imgGrayLight > light_set + 10 && exposure_time_set / scale > exposure_time_low)
                 {
                     exposure_time_set /= scale;
                 }
