@@ -33,7 +33,7 @@ jobs:
             sudo rosdep init
             rosdep update
             mkdir -p ~/catkin_ws/src
-            cp $GITHUB_WORKSPACE ~/catkin_ws/src/hik_camera_driver
+            cp -r $GITHUB_WORKSPACE ~/catkin_ws/src/hik_camera_driver
             cd ~/catkin_ws
             rosdep install --from-paths src --ignore-src -r -s  # do a dry-run first
             rosdep install --from-paths src --ignore-src -r -y
