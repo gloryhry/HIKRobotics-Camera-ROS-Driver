@@ -2,7 +2,10 @@
 
 [![ROS Noetic](https://github.com/gloryhry/HIKRobotics-Camera-ROS-Driver/actions/workflows/main.yml/badge.svg)](https://github.com/gloryhry/HIKRobotics-Camera-ROS-Driver/actions/workflows/main.yml)
 
-海康机器人工业相机ROS驱动包，包含海康MVS-SDK v2.1.2静态库。支持参数化配置，支持关闭自动曝光时通过ROS-topic配置曝光时间。
+海康机器人工业相机ROS驱动包，包含海康MVS-SDK v2.1.2静态库，开箱即用，无需安装MVS。
+
+- 支持参数化配置，支持修改帧率、触发模式、曝光、增益、数字偏移等参数。
+- 支持外部触发时无法调用相机自动曝光，驱动程序根据亮度控制曝光时间。
 
 仅通过MV-CA050-20GC相机测试，无法保证其他相机的适配性。
 
@@ -29,7 +32,7 @@ roslaunch hik_camera_driver camera.launch
 # 相机名称
 camera_name: camera
 Camera:
-  # 相机序列号
+  # 相机序列号（留空默认设置为第一个相机）
   serial_number: xxxxxxxxxxx
   # 相机内参文件 package://my_cameras/calibrations/${NAME}.yaml
   cam_info_url: package://hik_camera_driver/config/ost.yaml
@@ -63,10 +66,12 @@ Camera:
   Exposure: 2
   # 曝光时间 ≥0.0 ，单位 us
   Exposure_time: 5000
-  # 自动曝光时间上限
+  # 曝光时间上限
   ExposureTimeUp: 10000
-  # 自动曝光时间下限
+  # 曝光时间下限
   ExposureTimeLow: 100
+  # 程序控制曝光，仅当自动曝光设为手动时启用
+  Exposure_control: true
 
   # 自动增益
   # 0:Off

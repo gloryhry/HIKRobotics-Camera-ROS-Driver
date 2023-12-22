@@ -17,7 +17,7 @@ namespace HIKCAMERA
         image_transport::ImageTransport it(nh);
         cinfo_.reset(new camera_info_manager::CameraInfoManager(nh, camera_name, cam_info_url));
         camera_pub = it.advertiseCamera(camera_name + "/image", 1);
-        exposure_sub = nh.subscribe<std_msgs::Float32>(camera_name + "/set_exposure", 10, boost::bind(&Hik_camera_base::exposure_callback, this, _1));
+        // exposure_sub = nh.subscribe<std_msgs::Float32>(camera_name + "/set_exposure", 10, boost::bind(&Hik_camera_base::exposure_callback, this, _1));
     }
 
     bool Hik_camera_base::set_params()
