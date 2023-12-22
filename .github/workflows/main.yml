@@ -1,4 +1,4 @@
- name: ROS Build
+name: ROS Build
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
         with:
             path: catkin_ws/src/ros_comm
       - name: Install ROS
-          run: |
+        run: |
               sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
               sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
               sudo apt-get update -qq
@@ -30,7 +30,7 @@ jobs:
               sudo apt-get install -y ros-$ROS_DISTRO-catkin
               source /opt/ros/$ROS_DISTRO/setup.bash
       - name: Install ROS packages with rosdep
-          run: |
+        run: |
             source /opt/ros/$ROS_DISTRO/setup.bash
             sudo rosdep init
             rosdep update
@@ -39,21 +39,21 @@ jobs:
             rosdep install --from-paths src --ignore-src -r -s  # do a dry-run first
             rosdep install --from-paths src --ignore-src -r -y
       - name: catkin build
-          run: |
+        run: |
             source /opt/ros/$ROS_DISTRO/setup.bash
             cd ~/catkin_ws
             catkin config --install --cmake-args -DCMAKE_BUILD_TYPE=Release
             catkin build --no-status
             source devel/setup.bash
       - name: lint
-          run: |
+        run: |
             cd ~/catkin_ws
             # nothing uses linting here so this fails:
             # "Error: With --no-deps, you must specify packages to build."
             # catkin build $(catkin list --depends-on roslint -u) --no-deps --catkin-make-args roslint
             #
       - name: Tests
-          run: |
+        run: |
             cd ~/catkin_ws
             # nothing uses linting here so this fails:
             # "Error: With --no-deps, you must specify packages to build."
