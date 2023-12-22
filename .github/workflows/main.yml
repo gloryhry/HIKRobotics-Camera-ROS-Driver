@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-            path: catkin_ws/src/ros_comm
+            path: catkin_ws/src/hik_camera_driver
       - name: Install ROS
         run: |
               sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
@@ -45,6 +45,7 @@ jobs:
             catkin config --install --cmake-args -DCMAKE_BUILD_TYPE=Release
             catkin build --no-status
             source devel/setup.bash
+            zip -q -r ~/hik_camera_driver.zip ~/catkin_ws
       - name: lint
         run: |
             cd ~/catkin_ws
@@ -61,5 +62,5 @@ jobs:
       - name: Upload Package
         uses: actions/upload-artifact@v2
         with:
-          name: my-ros-package
-          path: path/to/my-ros-package
+          name: hik_camera_driver
+          path: ~/hik_camera_driver.zip
