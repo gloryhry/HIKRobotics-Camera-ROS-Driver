@@ -12,18 +12,6 @@ Camera:
   # 触发源
   # 0:Line0
   # 1:Line1
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-  include/hik_camera_driver
-  ${catkin_INCLUDE_DIRS}
-)
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-  include/hik_camera_driver
-  ${catkin_INCLUDE_DIRS}
-)
   # 2:Line2
   # 3.Line3
   # 4:Counter0
