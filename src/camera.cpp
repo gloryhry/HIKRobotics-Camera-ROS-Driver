@@ -1,4 +1,4 @@
-#include <hik_camera_driver/camera.h>
+#include <camera.h>
 
 namespace HIKCAMERA
 {
@@ -167,7 +167,7 @@ namespace HIKCAMERA
         // 0x0110000e:BayerGB10
         // 0x01100012:BayerGB12
         // 0x010C002C:BayerGB12Packed
-        setEnumValue("PixelFormat", PixelType_Gvsp_BayerBG10_Packed);
+        setEnumValue("PixelFormat", PixelType_Gvsp_BayerRG10_Packed);
         // 设置亮度
         setIntValue("Brightness", brightneess);
         ROS_INFO_STREAM("Brightness set to " << brightneess);

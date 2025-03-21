@@ -119,26 +119,54 @@ catkin_package(
 ## Build ##
 ###########
 
+if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    message("Building for x86_64")
+    include_directories(include/mvs)
+    LINK_DIRECTORIES(libs)
+    set(MVS_LIBRARIES libavutil.so
+        libCLAllSerial_gcc485_v3_0.so
+        libCLProtocol_gcc485_v3_0.so
+        libCLSerCOM.so
+        libCLSerHvc.so
+        libFormatConversion.so
+        libGCBase_gcc485_v3_0.so
+        libGenCP_gcc485_v3_0.so
+        liblog4cpp_gcc485_v3_0.so
+        libLog_gcc485_v3_0.so
+        libMediaProcess.so
+        libMvCameraControl.so
+        libMvCameraControlWrapper.so
+        libMvCamLVision.so
+        libMVFGControl.so
+        libMVGigEVisionSDK.so
+        libMVRender.so
+        libMvSDKVersion.so
+        libMvUsb3vTL.so
+        libswscale.so)
+elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    message("Building for aarch64")
+    include_directories(include/aarch64_mvs include/hik_camera_driver)
+    LINK_DIRECTORIES(libs)
+    set(MVS_LIBRARIES libavutil.so
+        libFormatConversion.so
+        libGenCP_gcc485_v3_0.so
+        libMediaProcess.so
+        libMvCameraControl.so
+        libMvCameraControlWrapper.so
+        libMVGigEVisionSDK.so
+        libMVRender.so
+        libMvSDKVersion.so
+        libMvUsb3vTL.so
+        libswscale.so
+        libusb-1.0.so.0)
+endif()
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-  include
+  include/hik_camera_driver
   ${catkin_INCLUDE_DIRS}
 )
-
-LINK_DIRECTORIES(
-  libs
-)
-
-set(MVS_LIBRARIES libGCBase_gcc447_v3_0.so
-                  libMvCameraControl.so
-                  libMVGigEVisionSDK.so
-                  liblog4cpp_gcc447_v3_0.so
-                  libMVRender.so
-                  libLog_gcc447_v3_0.so
-                  libMvUsb3vTL.so
-                  libMediaProcess.so
-                  )
 
 add_executable(camera_driver src/hik_driver.cpp
                              src/camera.cpp)
@@ -191,7 +219,7 @@ install(TARGETS camera_driver
 #         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #         RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
 
-install(DIRECTORY include/
+install(DIRECTORY include/hik_camera_driver
         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
         FILES_MATCHING PATTERN "*.h")
 
@@ -201,8 +229,19 @@ install(DIRECTORY launch/
 install(DIRECTORY config/
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config)
 
-install(DIRECTORY libs/
-        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/libs)
+if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+        install(DIRECTORY libs/
+                DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/libs)
+        install(DIRECTORY include/mvs
+                DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+                FILES_MATCHING PATTERN "*.h")
+elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+        install(DIRECTORY aarch64_libs/
+                DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/aarch64_libs)
+        install(DIRECTORY include/aarch64_mvs
+                DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+                FILES_MATCHING PATTERN "*.h")
+endif()
 
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html

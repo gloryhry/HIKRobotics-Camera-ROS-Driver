@@ -2,8 +2,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
-#include <mvs/MvCameraControl.h>
-#include <hik_camera_driver/camera.h>
+#include <MvCameraControl.h>
+#include <camera.h>
 
 #define Debug
 

@@ -1,7 +1,7 @@
 camera_name: camera
 Camera:
   # 相机序列号
-  serial_number: 00DA1999130
+  serial_number: DA5374246
   # 相机内参文件 package://my_cameras/calibrations/${NAME}.yaml
   cam_info_url: package://hik_camera_driver/config/ost.yaml
   # 帧率
@@ -12,6 +12,18 @@ Camera:
   # 触发源
   # 0:Line0
   # 1:Line1
+## Specify additional locations of header files
+## Your package locations should be listed before other locations
+include_directories(
+  include/hik_camera_driver
+  ${catkin_INCLUDE_DIRS}
+)
+## Specify additional locations of header files
+## Your package locations should be listed before other locations
+include_directories(
+  include/hik_camera_driver
+  ${catkin_INCLUDE_DIRS}
+)
   # 2:Line2
   # 3.Line3
   # 4:Counter0

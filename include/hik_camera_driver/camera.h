@@ -1,6 +1,6 @@
 #ifndef __HIK_CAMERA_DRIVER_CAMERA_H__
 #define __HIK_CAMERA_DRIVER_CAMERA_H__
-#include <mvs/MvCameraControl.h>
+#include <MvCameraControl.h>
 #include <vector>
 #include <pthread.h>
 #include <ros/ros.h>
