@@ -2,12 +2,13 @@
 
 [![ROS Noetic](https://github.com/gloryhry/HIKRobotics-Camera-ROS-Driver/actions/workflows/main.yml/badge.svg)](https://github.com/gloryhry/HIKRobotics-Camera-ROS-Driver/actions/workflows/main.yml)
 
-海康机器人工业相机ROS驱动包，包含海康MVS-SDK v2.1.2静态库，开箱即用，无需安装MVS。
+海康机器人工业相机ROS驱动包，包含海康MVS-SDK v3.0.1静态库，开箱即用，无需安装MVS。
 
 - 支持参数化配置，支持修改帧率、触发模式、曝光、增益、数字偏移等参数。
 - 支持外部触发时无法调用相机自动曝光，驱动程序根据亮度控制曝光时间。
+- 适配MV-CS050-10GC,适配x86和aarch64
 
-仅通过MV-CA050-20GC相机测试，无法保证其他相机的适配性。
+仅通过MV-CS050-10GC相机测试，无法保证其他相机的适配性。
 
 ## Install
 
