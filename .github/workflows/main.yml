@@ -59,7 +59,7 @@ jobs:
             # "Error: With --no-deps, you must specify packages to build."
             catkin run_tests
       - name: Upload Package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: hik_camera_driver
           path: ~/catkin_ws/install
