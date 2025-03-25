@@ -146,10 +146,9 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
 elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
     message("Building for aarch64")
     include_directories(include/aarch64_mvs include/hik_camera_driver)
-    LINK_DIRECTORIES(libs)
+    LINK_DIRECTORIES(aarch64_libs)
     set(MVS_LIBRARIES libavutil.so
         libFormatConversion.so
-        libGenCP_gcc485_v3_0.so
         libMediaProcess.so
         libMvCameraControl.so
         libMvCameraControlWrapper.so
