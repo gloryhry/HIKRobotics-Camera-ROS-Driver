@@ -230,13 +230,13 @@ install(DIRECTORY config/
 
 if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
         install(DIRECTORY libs/
-                DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/libs)
+                DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
         install(DIRECTORY include/mvs
                 DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
                 FILES_MATCHING PATTERN "*.h")
 elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
         install(DIRECTORY aarch64_libs/
-                DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/aarch64_libs)
+                DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
         install(DIRECTORY include/aarch64_mvs
                 DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
                 FILES_MATCHING PATTERN "*.h")
