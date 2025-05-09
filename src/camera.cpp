@@ -27,6 +27,7 @@ namespace HIKCAMERA
         int trigger_line;
         int trigger_action;
         float trigger_delay;
+        bool trigger_cache;
         int Exposure;
         float Exposure_time;
         int ExposureTimeUp, ExposureTimeLow;
@@ -43,6 +44,7 @@ namespace HIKCAMERA
         private_nh.param<int>("Camera/Tigger_line", trigger_line, 2);
         private_nh.param<int>("Camera/Trigger_action", trigger_action, 0);
         private_nh.param<float>("Camera/Trigger_delay", trigger_delay, 0.0);
+        private_nh.param<bool>("Camera/Trigger_cache_enable", trigger_cache, false);
         private_nh.param<int>("Camera/Exposure", Exposure, 2);
         private_nh.param<float>("Camera/Exposure_time", Exposure_time, 10000.0);
         private_nh.param<int>("Camera/ExposureTimeUp", ExposureTimeUp, 6000);
@@ -93,6 +95,8 @@ namespace HIKCAMERA
                 }
                 setFloatValue("TriggerDelay", trigger_delay);
                 ROS_INFO_STREAM("TriggerDelay set to " << trigger_delay << "us.");
+                setBoolValue("TriggerCacheEnable", trigger_cache);
+                ROS_INFO_STREAM("TriggerCacheEnable set to " << trigger_cache);
             }
             else
             {

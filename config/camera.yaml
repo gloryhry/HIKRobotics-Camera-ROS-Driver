@@ -8,7 +8,7 @@ Camera:
   frame_rate: 10.0
 
   # 触发模式
-  Trigger: false
+  Trigger: true
   # 触发源
   # 0:Line0
   # 1:Line1
@@ -17,7 +17,7 @@ Camera:
   # 4:Counter0
   # 7:Software
   # 8:FrequencyConverter
-  Tigger_line: 2
+  Tigger_line: 0
   # 触发上升沿、下降沿、高电平、低电平等
   # 0:RisingEdge
   # 1:FallingEdge
@@ -26,6 +26,7 @@ Camera:
   Trigger_action: 0
   # 触发延时 ≥0.0 ，单位 us
   Trigger_delay: 0.0
+  Trigger_cache_enable: true
 
   # 自动曝光
   # 0:Off
