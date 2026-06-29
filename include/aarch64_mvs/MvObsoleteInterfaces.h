@@ -1,4 +1,4 @@
-
+﻿
 #ifndef _MV_OBSOLETE_INTERFACES_H_
 #define _MV_OBSOLETE_INTERFACES_H_
 
@@ -1833,7 +1833,22 @@ MV_CAMCTRL_API int __stdcall MV_CAML_GetDeviceBauderate(IN void* handle,unsigned
 ************************************************************************/
 MV_CAMCTRL_API int __stdcall MV_CAML_GetSupportBauderates(IN void* handle,unsigned int* pnBaudrateAblity);
 
+/********************************************************************//**
+*  @~chinese
+*  @brief  注册流异常消息回调，在打开设备之后调用（只支持U3V相机，不支持GenTL设备）
+*  @param  handle                      [IN]            设备句柄
+*  @param  cbException                 [IN]            异常回调函数指针
+*  @param  pUser                       [IN]            用户自定义变量
+*  @return 成功,返回MV_OK,失败,返回错误码
 
+*  @~english
+*  @brief  Register exception stream callBack, call after open device (only support U3V Camera, don't support GenTL Device)
+*  @param  handle                      [IN]            Device handle
+*  @param  cbException                 [IN]            Exception callback function pointer
+*  @param  pUser                       [IN]            User defined variable
+*  @return Success, return MV_OK. Failure, return error code
+************************************************************************/
+MV_CAMCTRL_API int __stdcall MV_USB_RegisterStreamExceptionCallBack(IN void* handle, IN void(__stdcall* cbException)(MV_CC_STREAM_EXCEPTION_TYPE enExceptionType, void* pUser), IN void* pUser);
 
 /********************************************************************//**
  *  @~chinese

@@ -123,7 +123,7 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     message("Building for x86_64")
     include_directories(include/mvs)
     LINK_DIRECTORIES(libs)
-    set(MVS_LIBRARIES libavutil.so
+    set(MVS_LIBRARIES libavutil.so.60.8.100
         libCLAllSerial_gcc485_v3_0.so
         libCLProtocol_gcc485_v3_0.so
         libCLSerCOM.so
@@ -142,12 +142,12 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
         libMVRender.so
         libMvSDKVersion.so
         libMvUsb3vTL.so
-        libswscale.so)
+        libswscale.so.9.1.100)
 elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
     message("Building for aarch64")
     include_directories(include/aarch64_mvs include/hik_camera_driver)
     LINK_DIRECTORIES(aarch64_libs)
-    set(MVS_LIBRARIES libavutil.so
+    set(MVS_LIBRARIES libavutil.so.60.8.100
         libFormatConversion.so
         libMediaProcess.so
         libMvCameraControl.so
@@ -156,7 +156,7 @@ elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
         libMVRender.so
         libMvSDKVersion.so
         libMvUsb3vTL.so
-        libswscale.so
+        libswscale.so.9.1.100
         libusb-1.0.so.0)
 endif()
 

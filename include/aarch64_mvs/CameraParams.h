@@ -1,4 +1,4 @@
-
+﻿
 #ifndef _MV_CAMERA_PARAMS_H_
 #define _MV_CAMERA_PARAMS_H_
 
@@ -36,8 +36,10 @@ typedef struct _MV_GIGE_DEVICE_INFO_
     unsigned char       chSerialNumber[16];                         ///< [OUT] \~chinese 序列号                 \~english Serial Number
     unsigned char       chUserDefinedName[16];                      ///< [OUT] \~chinese 用户自定义名称         \~english User Defined Name 
     unsigned int        nNetExport;                                 ///< [OUT] \~chinese 网口IP地址             \~english NetWork IP Address
-
-    unsigned int        nReserved[4];                               ///<       \~chinese 预留                   \~english Reserved
+    unsigned int        nHostIP;                                    ///< [OUT] \~chinese 占用相机的主机IP地址   \~english The IP address of the host occupying the camera
+    unsigned int        nGenTLType;                                 ///< [OUT] \~chinese 设备的接口类型(0:普通网口相机 1:虚拟相机 2:采集卡上的相机)       \~english The Interface type of the device
+    unsigned int        nMulticastIP;                               ///< [OUT] \~chinese 组播IP地址             \~english Multicast IP Address
+    unsigned int        nMulticastPort;                             ///< [OUT] \~chinese 组播端口               \~english Multicast Port
 
 }MV_GIGE_DEVICE_INFO;
 
@@ -81,8 +83,6 @@ typedef struct _MV_CamL_DEV_INFO_
     unsigned int        nReserved[38];                              ///<       \~chinese 预留                   \~english Reserved
 
 }MV_CamL_DEV_INFO;
-
-
 
 ///< \~chinese CoaXPress相机信息      \~english CoaXPress device information
 typedef struct _MV_CXP_DEVICE_INFO_
@@ -143,17 +143,17 @@ typedef struct _MV_GENTL_VIR_DEVICE_INFO_
 
 ///< \~chinese 设备传输层协议类型       \~english Device Transport Layer Protocol Type
 #define MV_UNKNOW_DEVICE                0x00000000                  ///< \~chinese 未知设备类型，保留意义       \~english Unknown Device Type, Reserved 
-#define MV_GIGE_DEVICE                  0x00000001                  ///< \~chinese GigE设备                     \~english GigE Device
+#define MV_GIGE_DEVICE                  0x00000001                  ///< \~chinese GigE Vision设备              \~english GigE Version Device
 #define MV_1394_DEVICE                  0x00000002                  ///< \~chinese 1394-a/b 设备                \~english 1394-a/b Device
-#define MV_USB_DEVICE                   0x00000004                  ///< \~chinese USB 设备                     \~english USB Device
-#define MV_CAMERALINK_DEVICE            0x00000008                  ///< \~chinese CameraLink设备               \~english CameraLink Device
-#define MV_VIR_GIGE_DEVICE              0x00000010                  ///< \~chinese 虚拟GigE设备,包含虚拟GEV采集卡下的设备          \~english Virtual GigE Device,include GenTL virtual device
-#define MV_VIR_USB_DEVICE               0x00000020                  ///< \~chinese 虚拟USB设备,不支持虚拟采集卡下的设备             \~english Virtual USB Device,not supports GenTL virtual device
-#define MV_GENTL_GIGE_DEVICE            0x00000040                  ///< \~chinese 自研网卡下GigE设备,某些卡不支持此协议，如GE1104   \~english GenTL GigE Device
+#define MV_USB_DEVICE                   0x00000004                  ///< \~chinese USB3 Vision设备                    \~english USB3 Version Device
+#define MV_CAMERALINK_DEVICE            0x00000008                  ///< \~chinese 串口设备（包含Camera Link设备和串口光源控制器）          \~english CameraLink Device
+#define MV_VIR_GIGE_DEVICE              0x00000010                  ///< \~chinese 虚拟GigE Vision设备，包含虚拟GEV采集卡下的设备           \~english Virtual GigE Device, including GenTL virtual devices.
+#define MV_VIR_USB_DEVICE               0x00000020                  ///< \~chinese 虚拟USB3 Vision设备，不支持虚拟采集卡下的设备             \~english Virtual USB Device that does not support GenTL virtual devices.
+#define MV_GENTL_GIGE_DEVICE            0x00000040                  ///< \~chinese 自研网卡下GigE Vision设备，某些卡不支持此协议，如GE1104    \~english GenTL GigE Device
 #define MV_GENTL_CAMERALINK_DEVICE      0x00000080                  ///< \~chinese CameraLink相机设备          \~english GenTL CameraLink Camera Device   
 #define MV_GENTL_CXP_DEVICE             0x00000100                  ///< \~chinese CoaXPress设备              \~english GenTL CoaXPress Device
 #define MV_GENTL_XOF_DEVICE             0x00000200                  ///< \~chinese XoF设备                    \~english GenTL XoF Device
-#define MV_GENTL_VIR_DEVICE             0x00000800                  ///< \~chinese 虚拟采集卡下的设备，不支持虚拟GEV采集卡下的设备  \~english GenTL Virtual Device,not supports GenTL virtual GigE device
+#define MV_GENTL_VIR_DEVICE             0x00000800                  ///< \~chinese 虚拟采集卡下的设备，不支持虚拟GEV采集卡下的设备。        \~english GenTL Virtual Device that does not support GenTL virtual GigE devices.
 
 /// \~chinese 设备信息                  \~english Device info
 typedef struct _MV_CC_DEVICE_INFO_
@@ -205,6 +205,8 @@ typedef struct _MV_CC_DEVICE_INFO_LIST_
 #define MV_CXP_INTERFACE                     0x00000008          ///< \~chinese CoaXPress采集卡          \~english CoaXPress interface
 #define MV_XOF_INTERFACE                     0x00000010          ///< \~chinese XoFLink采集卡            \~english XoFLink interface
 #define MV_VIR_INTERFACE                     0x00000020          ///< \~chinese 虚拟采集卡               \~english Virtual interface
+#define MV_LC_INTERFACE                      0x00000040          ///< \~chinese  光源控制卡               \~english Light Controller interface
+
 
 ///< \~chinese 最大支持的采集卡数量  \~english The maximum number of Frame Grabber interface supported
 #define MV_MAX_INTERFACE_NUM             64
@@ -326,6 +328,91 @@ typedef struct _MV_CC_IMAGE_
 
 }MV_CC_IMAGE;
 
+typedef enum _MV_FRAME_EXTRA_INFO_TYPE_
+{
+    MV_FRAME_EXTRA_NO_INFO    = 0x0000,
+    MV_FRAME_EXTRA_SUBIMAGES  = 0x0001, // 子图
+    MV_FRAME_EXTRA_MULTIPARTS = 0x0002, // 多部分
+}MV_FRAME_EXTRA_INFO_TYPE;
+
+// ZONE方向（自上而下或者自下而上）
+typedef enum _MV_GIGE_ZONE_DIRECTION_
+{
+    MV_GIGE_PART_ZONE_TOP_DOWN = 0,
+    MV_GIGE_PART_ZONE_BOTTOM_UP = 1,
+} MV_GIGE_ZONE_DIRECTION;
+
+typedef struct _MV_GIGE_ZONE_INFO_
+{
+    MV_GIGE_ZONE_DIRECTION enDirection; // 解析方向 (0: 自上向下，1：自下向上）
+    union
+    {
+        unsigned char* pZoneAddr; // 起始地址
+        uint64_t       nAlign;    // 对齐
+    } stZone;
+    uint64_t nLength;           // 数据长度
+
+    unsigned int nReserved[6];  // 保留
+} MV_GIGE_ZONE_INFO;
+
+typedef union _MV_GIGE_MULRI_PART_DATA_INFO_
+{
+    // (data_type ≤ 0x0009) MV_MULTI_PART_DATA_TYPE
+    struct
+    {
+        unsigned int nSizeX;
+        unsigned int nSizeY;
+        unsigned int nOffsetX;
+        unsigned int nOffsetY;
+        unsigned short nPaddingX;
+    } stGeneral;
+
+    // (data_type == 0x000B or data_type == 0x000C) MV_MULTI_PART_DATA_TYPE
+    struct
+    {
+        unsigned char nJpegFlag;
+        unsigned int nTimestampTickFrequencyHigh;
+        unsigned int nTimestampTickFrequencyLow;
+        unsigned int nJpegDataFormat;
+    } stJpeg;
+
+    // 若是自定义类型则保留原始未解析数据，否则清空该字段
+    unsigned char pDataTypeSpecific[24];
+} MV_GIGE_PART_DATA_INFO;
+
+// 枚举类型
+typedef enum _MV_GIGE_MULTI_PART_DATA_TYPE_
+{
+    MV_GIGE_DT_2D_IMAGE_1_PLANAR = 0x0001,
+    MV_GIGE_DT_2D_IMAGE_2_PLANAR = 0x0002,
+    MV_GIGE_DT_2D_IMAGE_3_PLANAR = 0x0003,
+    MV_GIGE_DT_2D_IMAGE_4_PLANAR = 0x0004,
+    MV_GIGE_DT_3D_IMAGE_1_PLANAR = 0x0005,
+    MV_GIGE_DT_3D_IMAGE_2_PLANAR = 0x0006,
+    MV_GIGE_DT_3D_IMAGE_3_PLANAR = 0x0007,
+    MV_GIGE_DT_3D_IMAGE_4_PLANAR = 0x0008,
+    MV_GIGE_DT_CONFIDENCE_MAP = 0x0009,
+    MV_GIGE_DT_CHUNK_DATA = 0x000A,
+    MV_GIGE_DT_JPEG_IMAGE = 0x000B,
+    MV_GIGE_DT_JPEG2000_IMAGE = 0x000C,
+}MV_GIGE_MULTI_PART_DATA_TYPE;
+
+// MULTI_PART传输方式的缓存图像节点信息
+typedef struct _MV_GIGE_MULTI_PART_INFO_
+{
+    MV_GIGE_MULTI_PART_DATA_TYPE enDataType;         // 数据类型 MV_MULTI_PART_DATA_TYPE
+    unsigned int                 nDataFormat;        // 数据格式（例如像素格式）
+    unsigned int                 nSourceID;          // 图像源ID
+    unsigned int                 nRegionID;          // 区域ID
+    unsigned int                 nDataPurposeID;     // 目的ID
+    unsigned int                 nZones;             // 当前Part所包含的Zone区域数目
+    MV_GIGE_ZONE_INFO*           pZoneInfo;          // Zone信息
+    uint64_t                     nLength;            // 数据长度
+    unsigned char*               pPartAddr;             // 当前Part的起始数据地址
+    MV_GIGE_PART_DATA_INFO       stDataTypeSpecific;  // 数据类型携带的特定数据
+
+    unsigned int                 nReserved[8];       // 保留
+}MV_GIGE_MULTI_PART_INFO;
 
 /// \~chinese 输出帧的信息              \~english Output Frame Information
 typedef struct _MV_FRAME_OUT_INFO_EX_
@@ -380,16 +467,18 @@ typedef struct _MV_FRAME_OUT_INFO_EX_
     unsigned int            nExtendWidth;                           ///< [OUT] \~chinese 图像宽(扩展变量)       \~english Image Width
     unsigned int            nExtendHeight;                          ///< [OUT] \~chinese 图像高(扩展变量)       \~english Image Height
 
-	uint64_t                nFrameLenEx;                            ///< [OUT] \~chinese 帧的长度               \~english The Length of Frame
+    uint64_t                nFrameLenEx;                            ///< [OUT] \~chinese 帧的长度               \~english The Length of Frame
 
-    unsigned int            nReserved1;                             ///< [OUT] \~chinese 保留，用于对齐         \~english Reserved
-    unsigned int            nSubImageNum;                           ///< [OUT] \~chinese 图像缓存中的子图个数
+    unsigned int            nExtraType;                             ///< [OUT] \~chinese 判断携带的额外信息的类型：子图(SubImageList)还是多图(MultiPartArray) MV_FRAME_EXTRA_INFO_TYPE类型
+
+    unsigned int            nSubImageNum;                           ///< [OUT] \~chinese 图像缓存中的子图(多图)个数  \~english Sub Image（MulitiPart） Number
+
     union
     {
-        MV_CC_IMAGE*        pstSubImage;                            ///< [OUT] \~chinese 子图信息               \~english Sub image info
-        int64_t             nAligning;                              ///< [OUT] \~chinese 校准                   \~english Aligning
-    }SubImageList;
-
+        MV_CC_IMAGE* pstSubImage;                                   ///< [OUT] \~chinese 子图信息 \~english Sub image info
+        MV_GIGE_MULTI_PART_INFO* pstPartInfo;                       ///< [OUT] \~chinese 图像部分信息 \~english Image Parts Information
+        int64_t      nAligning;                                     ///< [OUT] \~chinese 校准 \~english Aligning
+    } SubImageList;
 
     union
     {
@@ -397,7 +486,12 @@ typedef struct _MV_FRAME_OUT_INFO_EX_
         int64_t             nAligning;                              ///< [OUT] \~chinese 校准                   \~english Aligning
     }UserPtr;
 
-	unsigned int            nReserved[26];                          ///<       \~chinese 预留                   \~english Reserved               
+    unsigned int            nFirstLineEncoderCount;                 ///< [OUT] \~chinese 首行编码器计数        \~english First line encoder count
+    unsigned int            nLastLineEncoderCount;                  ///< [OUT] \~chinese 尾行编码器计数        \~english Last line encoder count
+
+    unsigned int            nLastFrameFlag;                         ///< [OUT] \~chinese 电平结束时的最后一帧  \~english last level frame flag
+
+    unsigned int            nReserved[23];                          ///<       \~chinese 预留                   \~english Reserved               
 
 }MV_FRAME_OUT_INFO_EX;
 
@@ -511,7 +605,7 @@ typedef struct _MV_SAVE_IMAGE_PARAM_EX3_
     unsigned int            nJpgQuality;                            ///< [IN]  \~chinese JPG编码质量(50-99]，其它格式无效   \~english Encoding quality(50-99]，Other formats are invalid
 
 
-    unsigned int            iMethodValue;                           ///< [IN]  \~chinese 插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+  \~english Bayer interpolation method  0-Fast 1-Equilibrium 2-Optimal 3-Optimal+
+    unsigned int            iMethodValue;                           ///< [IN]  \~chinese 插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+ , RBGG/BRGG/GGRB/GGBR相关像素格式不支持0和3 \~english Bayer interpolation method  0-Fast 1-Equilibrium 2-Optimal 3-Optimal+, Pixels in RBGG/BRGG/GGRB/GGBR formats do not support 0 and 3.
 
     unsigned int            nReserved[3];                           ///<       \~chinese 预留                   \~english Reserved
 
@@ -521,29 +615,31 @@ typedef struct _MV_SAVE_IMAGE_PARAM_EX3_
 // 保存图片到文件参数
 typedef struct _MV_SAVE_IMAGE_TO_FILE_PARAM_EX_
 {
-    unsigned int        nWidth;             ///< [IN]     图像宽
-    unsigned int        nHeight;            ///< [IN]     图像高
-    enum MvGvspPixelType     enPixelType;   ///< [IN]     输入数据的像素格式
-    unsigned char*      pData;              ///< [IN]     输入数据缓存
-    unsigned int        nDataLen;           ///< [IN]     输入数据大小
+    unsigned int        nWidth;             ///< [IN] \~chinese    图像宽                  \~english Image Width
+    unsigned int        nHeight;            ///< [IN] \~chinese    图像高                  \~english Image Height
+    enum MvGvspPixelType     enPixelType;   ///< [IN] \~chinese    输入数据的像素格式       \~english Input Data Pixel Format
+    unsigned char*      pData;              ///< [IN] \~chinese    输入数据缓存             \~english Input Data Buffer
+    unsigned int        nDataLen;           ///< [IN] \~chinese    输入数据大小             \~english Input Data length
 
-    enum MV_SAVE_IAMGE_TYPE  enImageType;   ///< [IN]     输入图片格式
-    char*               pcImagePath;        ///< [IN]     输入文件路径
+    enum MV_SAVE_IAMGE_TYPE  enImageType;   ///< [IN] \~chinese    输入图片格式             \~english Output Image Format
+    char*               pcImagePath;        ///< [IN] \~chinese    输入文件路径, Windows平台路径长度不超过260字节，Linux平台不超过255字节    \~english Input file path, Windows platform path length does not exceed 260 bytes, Linux platform does not exceed 255 bytes.
 
-    unsigned int        nQuality;           ///< [IN]     JPG编码质量(50-99]，其它格式无效
-    int                 iMethodValue;       ///< [IN]     插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+
-    unsigned int        nReserved[8];
+    unsigned int        nQuality;           ///< [IN] \~chinese    JPG编码质量(50-99]，其它格式无效                                        \~english JPG encoding quality (50-99], other formats are invalid.
+    int                 iMethodValue;       ///< [IN] \~chinese    插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+, RBGG/BRGG/GGRB/GGBR相关像素格式不支持0和3 \~english Bayer interpolation method  0-Fast 1-Equilibrium 2-Optimal 3-Optimal+, Pixels in RBGG/BRGG/GGRB/GGBR formats do not support 0 and 3.
+    unsigned int        nEndian;            ///< [IN] \~chinese    保存TIFF图像时的字节序 1-大端存储  0、其他值-小端存储  \~english Byte order when saving TIFF images: 1 - big-endian storage, 0 or other values - little-endian storage.
+    unsigned int        nReserved[7];       ///<      \~chinese     预留                   \~english Reserved
 
 }MV_SAVE_IMAGE_TO_FILE_PARAM_EX;
 
 // 保存图片所需参数
 typedef struct _MV_CC_SAVE_IMAGE_PARAM_
 {
-    enum MV_SAVE_IAMGE_TYPE  enImageType;   ///< [IN]     输入图片格式
-    unsigned int        nQuality;           ///< [IN]     JPG编码质量(50-99]，其它格式无效
-    int                 iMethodValue;       ///< [IN]     插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+
+    enum MV_SAVE_IAMGE_TYPE  enImageType;   ///< [IN]   \~chinese  输入图片格式                        \~english Output Image Format
+    unsigned int        nQuality;           ///< [IN]   \~chinese  JPG编码质量(50-99]，其它格式无效     \~english JPG encoding quality (50-99], other formats are invalid.
+    int                 iMethodValue;       ///< [IN]   \~chinese  插值方法 0-快速 1-均衡（其它值默认为均衡） 2-最优 3-最优+, RBGG/BRGG/GGRB/GGBR相关像素格式不支持0和3  \~english Bayer interpolation method  0-Fast 1-Equilibrium 2-Optimal 3-Optimal+, Pixels in RBGG/BRGG/GGRB/GGBR formats do not support 0 and 3.
+    unsigned int        nEndian;            ///< [IN]   \~chinese  保存TIFF图像时的字节序 1-大端存储  0、其他值-小端存储      \~english Byte order when saving TIFF images: 1 - big-endian storage, 0 or other values - little-endian storage.
 
-    unsigned int        nReserved[8];
+    unsigned int        nReserved[7];       ///<        \~chinese  预留                   \~english Reserved
 
 }MV_CC_SAVE_IMAGE_PARAM;
 
@@ -648,9 +744,9 @@ typedef enum _MV_CC_GAMMA_TYPE_
 typedef struct _MV_CC_GAMMA_PARAM_T_
 {
     MV_CC_GAMMA_TYPE    enGammaType;                                ///< [IN]  \~chinese Gamma类型              \~english Gamma type
-    float               fGammaValue;                                ///< [IN]  \~chinese Gamma值:0.1 ~ 4.0       \~english Gamma value:0.1 ~ 4.0
+    float               fGammaValue;                                ///< [IN]  \~chinese Gamma值:0.1 ~ 4.0      \~english Gamma value:0.1 ~ 4.0
     unsigned char*      pGammaCurveBuf;                             ///< [IN]  \~chinese Gamma曲线缓存          \~english Gamma curve buffer
-    unsigned int        nGammaCurveBufLen;                          ///< [IN]  \~chinese Gamma曲线长度          \~english Gamma curve buffer size
+    unsigned int        nGammaCurveBufLen;                          ///< [IN]  \~chinese Gamma曲线缓存长度      \~english Gamma curve buffer size
 
     unsigned int        nRes[8];                                    ///<       \~chinese 预留                   \~english Reserved
 
@@ -738,16 +834,25 @@ typedef struct _MV_CC_PURPLE_FRINGING_PARAM_T_
 	unsigned int            nSrcBufLen;                             ///< [IN]  \~chinese 输入数据大小           \~english Input data length
 	enum MvGvspPixelType    enPixelType;                            ///< [IN]  \~chinese 像素格式               \~english Pixel format
 
-	unsigned char*          pDstBuf;                                ///< [OUT] \~chinese 输出数据缓存             \~english Output data buffer
-	unsigned int            nDstBufSize;                            ///< [IN]  \~chinese 提供的输出缓冲区大小      \~english Provided output buffer size
-	unsigned int            nDstBufLen;                             ///< [OUT] \~chinese 输出数据长度              \~english Output data length
+	unsigned char*          pDstBuf;                                ///< [OUT] \~chinese 输出数据缓存           \~english Output data buffer
+	unsigned int            nDstBufSize;                            ///< [IN]  \~chinese 提供的输出缓冲区大小   \~english Provided output buffer size
+	unsigned int            nDstBufLen;                             ///< [OUT] \~chinese 输出数据长度           \~english Output data length
 
-	unsigned int            nKernelSize;                            ///< [IN]  \~chinese 滤波核尺寸,推荐值3,5,7,9   \~english Filter Kernel Size, recommend 3,5,7,9
-	unsigned int            nEdgeThreshold;                         ///< [IN]  \~chinese 边缘阈值[0,2040]           \~english EdgeThreshold
+	unsigned int            nKernelSize;                            ///< [IN]     \~chinese 滤波核尺寸,仅支持3,5,7,9   \~english Filter Kernel Size, only supports 3,5,7,9
+	unsigned int            nEdgeThreshold;                         ///< [IN]     \~chinese 边缘阈值[0,2040]           \~english EdgeThreshold
 
-	unsigned int            nRes[8];                                ///<       \~chinese 预留                       \~english Reserved
+	unsigned int            nRes[8];                                ///<       \~chinese 预留                   \~english Reserved
 
 }MV_CC_PURPLE_FRINGING_PARAM;
+
+/// \~chinese ISP配置结构体          \~english ISP configuration structure
+typedef struct _MV_CC_ISP_CONFIG_PARAM_T_
+{
+    char*                   pcConfigPath;                           ///< [IN]  \~chinese 配置文件路径(路径修改后会重新创建算法句柄)            \~english Config file path
+
+    unsigned int            nRes[16];                               ///<       \~chinese 预留                    \~english Reserved
+
+}MV_CC_ISP_CONFIG_PARAM;
 
 /// \~chinese 无损解码参数              \~english High Bandwidth decode structure
 typedef struct _MV_CC_HB_DECODE_PARAM_T_
@@ -784,8 +889,8 @@ typedef struct _MV_CC_RECORD_PARAM_T_
     unsigned short          nWidth;                                 ///< [IN]  \~chinese 图像宽(2的倍数)        \~english Width
     unsigned short          nHeight;                                ///< [IN]  \~chinese 图像高(2的倍数)        \~english Height
 
-    float                   fFrameRate;                             ///< [IN]  \~chinese 帧率fps(大于1/16)      \~english The Rate of Frame
-    unsigned int            nBitRate;                               ///< [IN]  \~chinese 码率kbps(128-16*1024)  \~english The Rate of Bitrate
+    float                   fFrameRate;                             ///< [IN]  \~chinese 帧率fps [1/16 -1000]      \~english The Rate of Frame [1/16 -1000] 
+    unsigned int            nBitRate;                               ///< [IN]  \~chinese 码率kbps [128-16*1024]  \~english The Rate of Bitrate  [128-16*1024]
 
     MV_RECORD_FORMAT_TYPE   enRecordFmtType;                        ///< [IN]  \~chinese 录像格式               \~english Recode Format Type
 
@@ -798,12 +903,25 @@ typedef struct _MV_CC_RECORD_PARAM_T_
 /// \~chinese 传入的图像数据            \~english Input Data
 typedef struct _MV_CC_INPUT_FRAME_INFO_T_
 {
-    unsigned char*      pData;                                      ///< [IN]  \~chinese 图像数据指针           \~english Record Data
-    unsigned int        nDataLen;                                   ///< [IN]  \~chinese 图像大小               \~english The Length of Record Data
+    unsigned char*      pData;                                      ///< [IN]  \~chinese 图像数据指针           \~english Image data pointer
+    unsigned int        nDataLen;                                   ///< [IN]  \~chinese 图像大小               \~english Image length
 
     unsigned int        nRes[8];                                    ///<       \~chinese 预留                   \~english Reserved
 
 }MV_CC_INPUT_FRAME_INFO;
+
+/// \~chinese 传入的图像数据            \~english Input Data
+typedef struct _MV_CC_INPUT_FRAME_INFO_T_EX_
+{
+    enum MvGvspPixelType    enPixelType;                            ///< [IN]  \~chinese 输入数据的像素格式     \~english Pixel Type
+    unsigned int            nWidth;                                 ///< [IN]  \~chinese 图像宽                \~english Width
+    unsigned int            nHeight;                                ///< [IN]  \~chinese 图像高                \~english Height
+    unsigned char*          pData;                                  ///< [IN]  \~chinese 图像数据指针           \~english Image data pointer
+    uint64_t                nDataLen;                               ///< [IN]  \~chinese 图像大小               \~english Image length
+
+    unsigned int            nRes[8];                                ///<       \~chinese 预留                   \~english Reserved
+
+}MV_CC_INPUT_FRAME_INFO_EX;
 
 /// \~chinese 采集模式                  \~english Acquisition mode
 typedef enum _MV_CAM_ACQUISITION_MODE_
@@ -872,10 +990,32 @@ typedef enum _MV_CAM_TRIGGER_SOURCE_
     MV_TRIGGER_SOURCE_LINE2             = 2,                        ///< \~chinese Line2                        \~english Line2
     MV_TRIGGER_SOURCE_LINE3             = 3,                        ///< \~chinese Line3                        \~english Line3
     MV_TRIGGER_SOURCE_COUNTER0          = 4,                        ///< \~chinese Conuter0                     \~english Conuter0
+    MV_TRIGGER_SOURCE_LINE4             = 5,                        ///< \~chinese Line4                        \~english Line4
+    MV_TRIGGER_SOURCE_EncoderModuleOut  = 6,                        ///< \~chinese EncoderModuleOut             \~english EncoderModuleOut
+
 
     MV_TRIGGER_SOURCE_SOFTWARE          = 7,                        ///< \~chinese 软触发                       \~english Software
     MV_TRIGGER_SOURCE_FrequencyConverter= 8,                        ///< \~chinese 变频器                       \~english Frequency Converter
 
+    MV_TRIGGER_SOURCE_CCC1 = 9,                                    ///< \~chinese CC1                        \~english CC1
+    MV_TRIGGER_SOURCE_Action2 = 10,                                ///< \~chinese 动作2                      \~english Action2
+    MV_TRIGGER_SOURCE_CCC2 = 11,                                   ///< \~chinese CC2                        \~english CC2
+    MV_TRIGGER_SOURCE_CCC3 = 12,                                  ///< \~chinese CC3                        \~english CC3
+    MV_TRIGGER_SOURCE_CCC4 = 13,                                  ///< \~chinese CC4                        \~english CC4
+
+    MV_TRIGGER_SOURCE_LINE5 = 14,                                ///< \~chinese Line5                        \~english Line5
+    MV_TRIGGER_SOURCE_LINE6 = 15,                                ///< \~chinese Line6                        \~english Line6
+    MV_TRIGGER_SOURCE_LINE7 = 16,                                ///< \~chinese Line7                        \~english Line7
+    MV_TRIGGER_SOURCE_LINE8 = 17,                                ///< \~chinese Line8                        \~english Line8
+    MV_TRIGGER_SOURCE_LINE9 = 18,                                ///< \~chinese Line9                        \~english Line9
+    MV_TRIGGER_SOURCE_LINE10 = 19,                               ///< \~chinese Line10                        \~english Line10
+    MV_TRIGGER_SOURCE_LINE11 = 20,                               ///< \~chinese Line11                       \~english Line11
+
+    MV_TRIGGER_SOURCE_Action1 = 22,                               ///< \~chinese 动作1                       \~english Action1
+    MV_TRIGGER_SOURCE_Action3 = 23,                               ///< \~chinese 动作3                       \~english Action3
+    MV_TRIGGER_SOURCE_Action4 = 24,                               ///< \~chinese 动作4                       \~english Action4
+
+    MV_TRIGGER_SOURCE_Anyway = 25,                                  ///< \~chinese 多路                         \~english Anyway
 }MV_CAM_TRIGGER_SOURCE;
 
 /// \~chinese GigEVision IP配置         \~english GigEVision IP Configuration
@@ -902,17 +1042,29 @@ typedef enum _MV_CAM_TRIGGER_SOURCE_
 #define MV_EXCEPTION_DEV_DISCONNECT     0x00008001                  ///< \~chinese 设备断开连接                 \~english The device is disconnected
 #define MV_EXCEPTION_VERSION_CHECK      0x00008002                  ///< \~chinese SDK与驱动版本不匹配          \~english SDK does not match the driver version
 
-/// \~chinese U3V流异常类型
+/// \~chinese 流异常类型
 typedef enum _MV_CC_STREAM_EXCEPTION_TYPE_
 {
-    MV_CC_STREAM_EXCEPTION_ABNORMAL_IMAGE   = 0x4001,               ///< \~chinese 异常的图像，该帧被丢弃
-    MV_CC_STREAM_EXCEPTION_LIST_OVERFLOW    = 0x4002,               ///< \~chinese 缓存列表溢出，清除最旧的一帧
-    MV_CC_STREAM_EXCEPTION_LIST_EMPTY       = 0x4003,               ///< \~chinese 缓存列表为空，该帧被丢弃
-    MV_CC_STREAM_EXCEPTION_RECONNECTION     = 0x4004,               ///< \~chinese 断流恢复
-    MV_CC_STREAM_EXCEPTION_DISCONNECTED     = 0x4005,               ///< \~chinese 断流,恢复失败,取流被中止
-    MV_CC_STREAM_EXCEPTION_DEVICE           = 0x4006,               ///< \~chinese 设备异常,取流被中止
-
+    MV_CC_STREAM_EXCEPTION_ABNORMAL_IMAGE        = 0x4001,               ///< \~chinese 图像异常(图像长度不正确、数据包内容解析异常和校验失败等),丢弃该帧(可能原因：链路传输异常和设备发包异常等)
+    MV_CC_STREAM_EXCEPTION_LIST_OVERFLOW         = 0x4002,               ///< \~chinese 缓存列表已满(没有及时取走图像),采集卡下相机不支持, 外部注册缓存时, 单USB口相机不支持
+    MV_CC_STREAM_EXCEPTION_LIST_EMPTY            = 0x4003,               ///< \~chinese 缓存列表为空(取走图像后未及时将图像缓存归还)
+    MV_CC_STREAM_EXCEPTION_RECONNECTION          = 0x4004,               ///< \~chinese 触发一次断流恢复(仅U3V支持)
+    MV_CC_STREAM_EXCEPTION_DISCONNECTED          = 0x4005,               ///< \~chinese 断流恢复失败,取流被中止(仅U3V支持)
+    MV_CC_STREAM_EXCEPTION_DEVICE                = 0x4006,               ///< \~chinese 设备异常,取流被中止(仅U3V支持)
+    MV_CC_STREAM_EXCEPTION_PARTIAL_IMAGE         = 0x4007,               ///< \~chinese 行高不足,丢弃残帧(线阵相机或者采集卡配置了残帧丢弃模式,出图行高不足时被SDK丢弃)
+    MV_CC_STREAM_EXCEPTION_IMAGE_BUFFER_OVERFLOW = 0x4008,               ///< \~chinese 设备发送的图像数据大小超过了图像缓冲区容量(该帧丢弃)
 }MV_CC_STREAM_EXCEPTION_TYPE;
+
+/// \~chinese 流异常回调信息        \~english Stream exception callback infomation
+typedef struct _MV_CC_STREAM_EXCEPTION_INFO_T_
+{
+    char                chSerialNumber[INFO_MAX_BUFFER_SIZE];       ///< [OUT] \~chinese 设备序列号             \~english Device serial number
+    unsigned int        nStreamIndex;                               ///< [OUT] \~chinese 流通道序号             \~english Stream index
+    MV_CC_STREAM_EXCEPTION_TYPE enExceptionType;                    ///< [OUT] \~chinese 流异常类型             \~english Exception type
+
+    unsigned int        nReserved[8];                               ///<       \~chinese 预留                   \~english Reserved
+
+}MV_CC_STREAM_EXCEPTION_INFO;
 
 ///< \~chinese 设备Event事件名称最大长度    \~english Max length of event name
 #define MAX_EVENT_NAME_SIZE             128
@@ -1002,10 +1154,10 @@ typedef struct _MV_ACTION_CMD_INFO_T
     unsigned int        nGroupMask;                                 ///< [IN]  \~chinese 组掩码                                     \~english Group Mask
 
     unsigned int        bActionTimeEnable;                          ///< [IN]  \~chinese 只有设置成1时Action Time才有效，非1时无效  \~english Action Time Enable
-    int64_t             nActionTime;                                ///< [IN]  \~chinese 预定的时间，和主频有关                     \~english Action Time
+    int64_t             nActionTime;                                ///< [IN]  \~chinese 动作生效的时间，和相机主频有关，与相机时间戳处于同一时间域  \~english The action time is related to the camera's main frequency and is in the same time domain as the camera timestamp.
 
     const char*         pBroadcastAddress;                          ///< [IN]  \~chinese 广播包地址                                 \~english Broadcast Address
-    unsigned int        nTimeOut;                                   ///< [IN]  \~chinese 等待ACK的超时时间，如果为0表示不需要ACK    \~english TimeOut
+    unsigned int        nTimeOut;                                   ///< [IN]  \~chinese 等待ACK的超时时间（单位ms），如果为0表示不需要ACK    \~english Timeout for waiting for ACK (in milliseconds). A value of 0 indicates no ACK is required.
 
     unsigned int        bSpecialNetEnable;                          ///< [IN]  \~chinese 只有设置成1时指定的网卡IP才有效，非1时无效 \~english Special IP Enable
     unsigned int        nSpecialNetIP;                              ///< [IN]  \~chinese 指定的网卡IP                               \~english Special Net IP address
@@ -1041,18 +1193,18 @@ typedef struct _MV_ACTION_CMD_RESULT_LIST_T
 /// \~chinese 每个节点对应的接口类型    \~english Interface type corresponds to each node 
 enum MV_XML_InterfaceType
 {
-    IFT_IValue,                                                     ///< \~chinese Value                        \~english IValue interface
-    IFT_IBase,                                                      ///< \~chinese Base                         \~english IBase interface
-    IFT_IInteger,                                                   ///< \~chinese Integer                      \~english IInteger interface
-    IFT_IBoolean,                                                   ///< \~chinese Boolean                      \~english IBoolean interface
-    IFT_ICommand,                                                   ///< \~chinese Command                      \~english ICommand interface
-    IFT_IFloat,                                                     ///< \~chinese Float                        \~english IFloat interface
-    IFT_IString,                                                    ///< \~chinese String                       \~english IString interface
-    IFT_IRegister,                                                  ///< \~chinese Register                     \~english IRegister interface
-    IFT_ICategory,                                                  ///< \~chinese Category                     \~english ICategory interface
-    IFT_IEnumeration,                                               ///< \~chinese Enumeration                  \~english IEnumeration interface
-    IFT_IEnumEntry,                                                 ///< \~chinese EnumEntry                    \~english IEnumEntry interface
-    IFT_IPort,                                                      ///< \~chinese Port                         \~english IPort interface
+    IFT_IValue,                                                     ///< \~chinese 值类型                       \~english IValue interface
+    IFT_IBase,                                                      ///< \~chinese 通用类型                     \~english IBase interface
+    IFT_IInteger,                                                   ///< \~chinese 整形                         \~english IInteger interface
+    IFT_IBoolean,                                                   ///< \~chinese 布尔型                       \~english IBoolean interface
+    IFT_ICommand,                                                   ///< \~chinese 命令型                       \~english ICommand interface
+    IFT_IFloat,                                                     ///< \~chinese 浮点型                       \~english IFloat interface
+    IFT_IString,                                                    ///< \~chinese 字符串型                     \~english IString interface
+    IFT_IRegister,                                                  ///< \~chinese 寄存器型                     \~english IRegister interface
+    IFT_ICategory,                                                  ///< \~chinese 类别型                       \~english ICategory interface
+    IFT_IEnumeration,                                               ///< \~chinese 枚举型                       \~english IEnumeration interface
+    IFT_IEnumEntry,                                                 ///< \~chinese 枚举条目                     \~english IEnumEntry interface
+    IFT_IPort,                                                      ///< \~chinese 端口型                       \~english IPort interface
 };
 
 /// \~chinese 节点的访问模式            \~english Node Access Mode
@@ -1213,7 +1365,7 @@ typedef struct _MVCC_COLORF
 	float           fR;             ///< [IN] \~chinese 红色，根据像素颜色的相对深度，范围为[0.0 , 1.0]，代表着[0, 255]的颜色深度   \~english Red，Range[0.0, 1.0]
     float           fG;             ///< [IN] \~chinese 绿色，根据像素颜色的相对深度，范围为[0.0 , 1.0]，代表着[0, 255]的颜色深度   \~english Green，Range[0.0, 1.0]
     float           fB;             ///< [IN] \~chinese 蓝色，根据像素颜色的相对深度，范围为[0.0 , 1.0]，代表着[0, 255]的颜色深度   \~english Blue，Range[0.0, 1.0]
-    float           fAlpha;         ///< [IN] \~chinese 透明度，根据像素颜色的相对透明度，范围为[0.0 , 1.0]    \~english Alpha，Range[0.0, 1.0]
+    float           fAlpha;         ///< [IN] \~chinese 透明度，根据像素颜色的相对透明度，范围为[0.0 , 1.0],GDI渲染不支持   \~english Alpha，Range[0.0, 1.0], it is not supported under GDI rendering.
     unsigned int    nReserved[4];   ///<      \~chinese 预留                        \~english Reserved
 
 }MVCC_COLORF;
@@ -1327,4 +1479,89 @@ typedef struct _MV_CAML_SERIAL_PORT_LIST_
     unsigned int                  nRes[4];                               ///<\~chinese 预留                             \~english Reserved
 }MV_CAML_SERIAL_PORT_LIST;
 
+/// \~chinese 液态镜头正常消息类型\        \~english LiquidLens message type
+typedef enum _MV_CC_LIQUIDLENS_MSG_TYPE_
+{
+    MV_CC_LIQUIDLENS_MSG_FOCAL_POWER_CHANGE = 1,        ///< \~chinese 光焦度变化                 \~english Focal power change
+    MV_CC_LIQUIDLENS_MSG_RANGE_SCAN_COMPLETED = 2,      ///< \~chinese 光焦度区间扫描结束          \~english Range scan completed
+    MV_CC_LIQUIDLENS_MSG_MULTI_FP_SCAN_COMPLETED = 3,   ///< \~chinese 多光焦度扫描结束            \~english Multi focal power scan completed
+}MV_CC_LIQUIDLENS_MSG_TYPE;
+
+/// \~chinese 液态镜头异常事件类型\        \~english LiquidLens exception event type
+typedef enum _MV_CC_LIQUIDLENS_EXCEPTION_TYPE_
+{
+    MV_CC_LIQUIDLENS_EXCEPTION_OFFLINE = 1,    ///< \~chinese 液态镜头掉线 \~english Liquid lens offline
+} MV_CC_LIQUIDLENS_EXCEPTION_TYPE;
+
+/// \~chinese 液态镜头消息回调信息\        \~english LiquidLens msg callback information
+typedef struct _MV_CC_LIQUIDLENS_MSG_
+{
+    MV_CC_LIQUIDLENS_MSG_TYPE nMsgType;          ///< \~chinese 消息类型 \~english Message type
+    int   nCurFocalPower;                        ///< \~chinese 消息数据，当 nMsgType为MV_CC_LIQUIDLENS_MSG_FOCAL_POWER_CHANGE 时，表示当前光焦度值（光焦度（实际）* 1000），其他消息类型请忽略此值 \~english Message data, when nMsgType is MV_CC_LIQUIDLENS_MSG_FOCAL_POWER_CHANGE, indicates current focal power value (actual focal power * 1000), ignore this value for other message types
+    unsigned int   nReserved[16];                ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_MSG;
+
+/// \~chinese 液态镜头异常消息回调信息\        \~english LiquidLens exception msg callback information
+typedef struct _MV_CC_LIQUIDLENS_EXCEPTION_MSG_
+{
+    MV_CC_LIQUIDLENS_EXCEPTION_TYPE nMsgType;    ///< \~chinese 异常消息类型 \~english Exception Message type
+    unsigned int   nReserved[16];                ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_EXCEPTION_MSG;
+
+/// \~chinese 液态镜头基本信息\        \~english LiquidLens basic information
+typedef struct _MV_CC_LIQUIDLENS_INFO_
+{
+    unsigned char       chSerialNumber[INFO_MAX_BUFFER_SIZE];       ///< [OUT] \~chinese 序列号                 \~english Serial Number
+    unsigned char       chModelName[INFO_MAX_BUFFER_SIZE];          ///< [OUT] \~chinese 型号名字               \~english Model Name
+    unsigned char       chFirmwareVersion[INFO_MAX_BUFFER_SIZE];    ///< [OUT] \~chinese 驱动板的固件版本        \~english Firmware Version
+    int                 nSupportsTempCompensation;                  ///< [OUT] \~chinese 是否支持温度补偿,0-不支持，1-支持 \~english Supports Temperature Compensation 0-unsupported 1-supported
+    unsigned int        nLensStableTime;                            ///< [OUT] \~chinese 镜头稳定时间，单位ms     \~english Lens stable time ms
+    int                 nMaxFocalPower;                             ///< [OUT] \~chinese 镜头的最大光焦度（1000 * dpt)     \~english Maximum focal power of the lens (1000 × dpt)             
+    int                 nMinFocalPower;                             ///< [OUT] \~chinese 镜头的最小光焦度（1000 * dpt)     \~english Minimum focal power of the lens (1000 × dpt)   
+    unsigned int        nRes[32];                                   ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_INFO;
+
+/// \~chinese 液态镜头区间扫描\        \~english LiquidLens range scan
+typedef struct _MV_CC_LIQUIDLENS_RANGE_SCAN_PARAM_
+{
+    int nFocalPowerStart;        ///< \~chinese 起始光焦度值,范围[INT16_MIN, INT16_MAX] \~english Start focal power value, range[INT16_MIN, INT16_MAX]
+    int nFocalPowerEnd;          ///< \~chinese 结束光焦度值,范围[INT16_MIN, INT16_MAX] \~english End focal power value, range[INT16_MIN, INT16_MAX]
+    unsigned int nSteps;         ///< \~chinese 扫描步数,扫描步数，范围：[1,200] \~english Scan steps, range: [1,200]
+    unsigned int nDwellTimeMs;   ///< \~chinese 每步停留时间（毫秒）范围[1,10000]，镜头移动到指定光焦度后，会等待此时间段，以确保镜头稳定并完成图像采集 \~english Dwell time per step (ms) range [1,10000], after moving to specified focal power, wait this period to ensure lens stability and complete image acquisition
+    unsigned int nRes[8];        ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_RANGE_SCAN_PARAM;
+
+/// \~chinese 液态镜头自动对焦\        \~english LiquidLens autofocus
+typedef struct _MV_CC_LIQUIDLENS_AUTOFOCUS_PARAM_
+{
+    int nFocalPowerStart;        ///< \~chinese 起始光焦度值,范围[INT16_MIN, INT16_MAX] \~english Start focal power value, range[INT16_MIN, INT16_MAX]
+    int nFocalPowerEnd;          ///< \~chinese 结束光焦度值,范围[INT16_MIN, INT16_MAX] \~english End focal power value, range[INT16_MIN, INT16_MAX]
+    unsigned int nCoarseSteps;   ///< \~chinese 粗调阶段步数，范围[3-20], 推荐6。步数越大，搜索越精细但对焦耗时越长；步数越小，搜索越快但可能错过最佳焦点 \~english Coarse adjustment steps, range [3-20], recommended 6. Larger steps: finer search but longer focus time; Smaller steps: faster search but may miss best focus
+    int nRoiEnable;              ///< \~chinese 是否使能ROI,0-禁用，非0-使能 \~english Enable ROI, 0-disable, non-zero enable
+    unsigned int nOffsetX;       ///< \~chinese ROI区域左上角X坐标 \~english ROI area top-left X coordinate
+    unsigned int nOffsetY;       ///< \~chinese ROI区域左上角Y坐标 \~english ROI area top-left Y coordinate
+    unsigned int nRoiWidth;      ///< \~chinese ROI区域宽度 \~english ROI area width
+    unsigned int nRoiHeight;     ///< \~chinese ROI区域高度 \~english ROI area height
+    unsigned int nRes[10];        ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_AUTOFOCUS_PARAM;
+
+#define MV_MAX_FOCALPOWER_NUM     32  ///< \~chinese 最大变焦次数 \~english Maximum focal power number
+
+/// \~chinese 液态镜头多焦度轮询\        \~english LiquidLens multi focal power scan
+typedef struct _MV_CC_LIQUIDLENS_MULTI_FP_SCAN_PARAM_
+{
+    unsigned int nFocalPowerNum;                         ///< \~chinese 实际光焦度数量,范围[1, 32] \~english Actual focal power count, range[1, 32]
+    int nFocalPowers[MV_MAX_FOCALPOWER_NUM];             ///< \~chinese 光焦度数组,光焦度数值范围[INT16_MIN, INT16_MAX] \~english Focal power array, focal power value range[INT16_MIN, INT16_MAX]
+    unsigned int nDwellTimeMs[MV_MAX_FOCALPOWER_NUM];    ///< \~chinese 光焦度停留时间(毫秒)数组,数值范围[1,10000] \~english Dwell time (ms) array, time(ms) value range [1,10000]
+    unsigned int nRes[8];                                ///< \~chinese 预留 \~english Reserved
+}MV_CC_LIQUIDLENS_MULTI_FP_SCAN_PARAM;
+
+/// \~chinese 液态镜头用户集\        \~english LiquidLens user set
+typedef enum _MV_CC_LIQUIDLENS_USERSET_
+{
+    MV_CC_LIQUIDLENS_DEFALUT = 0,   ///< \~chinese 默认用户集 \~english Default user set
+    MV_CC_LIQUIDLENS_USERSET1 = 1,  ///< \~chinese userset1 \~english User set 1
+    MV_CC_LIQUIDLENS_USERSET2 = 2,  ///< \~chinese userset2 \~english User set 2
+    MV_CC_LIQUIDLENS_USERSET3 = 3,  ///< \~chinese userset3 \~english User set 3
+}MV_CC_LIQUIDLENS_USERSET;
 #endif /* _MV_CAMERA_PARAMS_H_ */
