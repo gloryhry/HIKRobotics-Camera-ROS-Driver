@@ -18,6 +18,8 @@ namespace HIKCAMERA
         cinfo_.reset(new camera_info_manager::CameraInfoManager(nh, camera_name, cam_info_url));
         camera_pub = it.advertiseCamera(camera_name + "/image", 1);
         // exposure_sub = nh.subscribe<std_msgs::Float32>(camera_name + "/set_exposure", 10, boost::bind(&Hik_camera_base::exposure_callback, this, _1));
+        // 帧互斥量一次性初始化 (移出 ImageStream, 避免重启时对已初始化 mutex 重复 init 触发 POSIX UB)
+        pthread_mutex_init(&mutex, NULL);
     }
 
     bool Hik_camera_base::set_params()
@@ -45,6 +47,17 @@ namespace HIKCAMERA
         private_nh.param<int>("Camera/Trigger_action", trigger_action, 0);
         private_nh.param<float>("Camera/Trigger_delay", trigger_delay, 0.0);
         private_nh.param<bool>("Camera/Trigger_cache_enable", trigger_cache, false);
+
+        // 取图超时重启参数
+        private_nh.param<int>("Camera/grab_timeout_retry", grab_timeout_retry_threshold_, 5);
+        private_nh.param<int>("Camera/restart_max_retries", restart_max_retries_, 0);
+        // 触发模式下无触发信号时取图超时是正常的, 重启无意义 -> 自动禁用
+        if (trigger_mode && grab_timeout_retry_threshold_ > 0)
+        {
+            ROS_WARN_STREAM("Trigger mode ON: disabling grab-timeout restart "
+                            "(set grab_timeout_retry=0 explicitly).");
+            grab_timeout_retry_threshold_ = 0;
+        }
         private_nh.param<int>("Camera/Exposure", Exposure, 2);
         private_nh.param<float>("Camera/Exposure_time", Exposure_time, 10000.0);
         private_nh.param<int>("Camera/ExposureTimeUp", ExposureTimeUp, 6000);
@@ -387,8 +400,59 @@ namespace HIKCAMERA
         return true;
     }
 
+    bool Hik_camera_base::getIntValueEx(std::string name, int64_t &value)
+    {
+        MVCC_INTVALUE_EX stValue = {0};
+        nRet = MV_CC_GetIntValueEx(m_handle, name.c_str(), &stValue);
+        if (MV_OK != nRet)
+        {
+            ROS_ERROR("get %s failed! nRet [%x]\n", name.c_str(), nRet);
+            return false;
+        }
+        value = stValue.nCurValue;
+        return true;
+    }
+
+    bool Hik_camera_base::readTickFrequency()
+    {
+        // 1. GigE 标准节点
+        if (getIntValueEx("GevTimestampTickFrequency", tick_frequency_) && tick_frequency_ > 0)
+        {
+            ROS_INFO("Tick frequency (GevTimestampTickFrequency): %ld Hz", tick_frequency_);
+            return true;
+        }
+        ROS_WARN("GevTimestampTickFrequency read failed, trying USB3 nodes...");
+        // 2. USB3 节点
+        if (getIntValueEx("DeviceTickFrequency", tick_frequency_) && tick_frequency_ > 0)
+        {
+            ROS_INFO("Tick frequency (DeviceTickFrequency): %ld Hz", tick_frequency_);
+            return true;
+        }
+        // 3. 备选 USB3 节点名
+        if (getIntValueEx("DeviceTimestampTickFrequency", tick_frequency_) && tick_frequency_ > 0)
+        {
+            ROS_INFO("Tick frequency (DeviceTimestampTickFrequency): %ld Hz", tick_frequency_);
+            return true;
+        }
+        // 4. Fallback: 1 GHz
+        ROS_WARN("Cannot read tick frequency from camera, using default 1e9 Hz (1 GHz)");
+        tick_frequency_ = 1000000000;
+        return true;
+    }
+
     bool Hik_camera_base::ImageStream()
     {
+        // 读取标定参数
+        private_nh.param<int>("Camera/calib_frame_count", calib_frame_count_, 50);
+        private_nh.param<double>("Camera/calib_iqr_multiplier", calib_iqr_multiplier_, 1.5);
+        ROS_INFO("Timestamp calibration: %d frames, IQR multiplier=%.1f (tick freq auto-derived)",
+                 calib_frame_count_, calib_iqr_multiplier_);
+
+        // 重置线程控制标志 (新 WorkThread 可运行, 清除残留重启请求)
+        stop_requested_ = false;
+        need_restart_   = false;
+        thread_running_ = false;
+
         // 开始取流
         nRet = MV_CC_StartGrabbing(m_handle);
         if (MV_OK != nRet)
@@ -396,49 +460,111 @@ namespace HIKCAMERA
             ROS_ERROR("MV_CC_StartGrabbing fail! nRet [%x]\n", nRet);
             return false;
         }
-        // 设置互斥量
-        nRet = pthread_mutex_init(&mutex, NULL);
-        if (nRet != 0)
-        {
-            ROS_ERROR("pthread create failed\n");
-            return false;
-        }
-        nRet = pthread_create(&nThreadID, NULL, WorkThread, m_handle);
-        if (MV_OK != nRet)
+        // 互斥量已在构造函数一次性初始化, 此处不再重复 init
+        nRet = pthread_create(&nThreadID, NULL, WorkThread, this);
+        if (0 != nRet)
         {
             ROS_ERROR("thread create failed.ret = %d\n", nRet);
             return false;
         }
+        thread_started_ = true;
         // start to loop
         return true;
     }
 
     void Hik_camera_base::stopStream()
     {
-        // 停止取流
-        nRet = MV_CC_StopGrabbing(m_handle);
-        if (MV_OK != nRet)
+        // 1. 请求 WorkThread 退出
+        stop_requested_ = true;
+        // 2. join WorkThread 前先 StopGrabbing, 解除在途 GetOneFrameTimeout 阻塞
+        if (thread_started_)
         {
-            printf("MV_CC_StopGrabbing fail! nRet [%x]\n", nRet);
+            if (m_handle)
+            {
+                nRet = MV_CC_StopGrabbing(m_handle);
+                if (MV_OK != nRet)
+                    ROS_WARN_STREAM("MV_CC_StopGrabbing fail/warn nRet [0x" << std::hex << nRet << "]");
+            }
+            // join 是权威同步点: 此后 WorkThread 已退出, pData/m_pBufForSaveImage 已由其内部 free
+            pthread_join(nThreadID, nullptr);
+            thread_started_ = false;
+        }
+        // 3. 关闭设备 + 销毁句柄 (无早返回, 修复原先 StopGrabbing 失败就跳过后续清理的泄漏)
+        if (m_handle)
+        {
+            nRet = MV_CC_CloseDevice(m_handle);
+            if (MV_OK != nRet)
+                ROS_WARN_STREAM("MV_CC_CloseDevice fail nRet [0x" << std::hex << nRet << "]");
+            nRet = MV_CC_DestroyHandle(m_handle);
+            if (MV_OK != nRet)
+                ROS_WARN_STREAM("MV_CC_DestroyHandle fail nRet [0x" << std::hex << nRet << "]");
+            m_handle = NULL;
+        }
+        thread_running_ = false;
+    }
+
+    bool Hik_camera_base::restart()
+    {
+        ROS_WARN_STREAM("Camera restart: stopping stream and joining work thread...");
+        stopStream(); // 置 stop_requested_ -> StopGrabbing 解除阻塞 -> join WorkThread -> Close+Destroy
+
+        // 丢弃旧帧, 避免重启后发布陈旧图像
+        pthread_mutex_lock(&mutex);
+        frame.reset();
+        frame_empty = true;
+        pthread_mutex_unlock(&mutex);
+
+        // 复用已保存的设备信息, 无需重新枚举
+        if (!set_camera(m_stDevInfo))
+        {
+            ROS_ERROR_STREAM("Restart: set_camera failed!");
+            return false;
+        }
+        if (!set_params())
+        {
+            ROS_ERROR_STREAM("Restart: set_params failed!");
+            return false;
+        }
+        if (!ImageStream())
+        {
+            ROS_ERROR_STREAM("Restart: ImageStream failed!");
+            return false;
+        }
+        ROS_WARN_STREAM("Camera restart: stream resumed, new work thread started.");
+        return true;
+    }
+
+    void Hik_camera_base::check_and_restart()
+    {
+        if (!need_restart_)
+            return;
+
+        ros::Time now = ros::Time::now();
+        // 指数退避: 1,2,4,8,16,32, 封顶 60s
+        double backoff = std::min(60.0, std::pow(2.0, std::min(restart_attempts_, 6)));
+        if (restart_attempts_ > 0 && (now - last_restart_time_).toSec() < backoff)
+            return; // 仍在退避窗口内, 等待
+        last_restart_time_ = now;
+
+        if (restart_max_retries_ > 0 && restart_attempts_ >= restart_max_retries_)
+        {
+            ROS_ERROR_STREAM("Restart attempts " << restart_attempts_
+                             << " >= max " << restart_max_retries_ << ", shutting down node.");
+            ros::shutdown();
             return;
         }
-        printf("MV_CC_StopGrabbing succeed.\n");
-        // 关闭设备
-        nRet = MV_CC_CloseDevice(m_handle);
-        if (MV_OK != nRet)
+
+        if (restart())
         {
-            printf("MV_CC_CloseDevice fail! nRet [%x]\n", nRet);
-            return;
+            restart_attempts_ = 0; // ImageStream 已清 need_restart_
         }
-        printf("MV_CC_CloseDevice succeed.\n");
-        // 销毁句柄
-        nRet = MV_CC_DestroyHandle(m_handle);
-        if (MV_OK != nRet)
+        else
         {
-            printf("MV_CC_DestroyHandle fail! nRet [%x]\n", nRet);
-            return;
+            restart_attempts_++;
+            need_restart_ = true; // 重新武装 (ImageStream 成功路径会清, 失败则保持)
+            ROS_ERROR_STREAM("Restart attempt " << restart_attempts_
+                             << " failed; will retry in ~" << backoff << "s");
         }
-        printf("MV_CC_DestroyHandle succeed.\n");
     }
 
     bool Hik_camera_base::changeExposureTime(float value)
@@ -474,8 +600,18 @@ namespace HIKCAMERA
         }
     }
 
-    void *Hik_camera_base::WorkThread(void *p_handle)
+    void *Hik_camera_base::WorkThread(void *p_user)
     {
+        Hik_camera_base *self = (Hik_camera_base *)p_user;
+        void *p_handle = self->m_handle;
+        self->thread_running_ = true;
+        // RAII: 保证所有 return 路径都把 thread_running_ 置 false
+        struct RunningGuard
+        {
+            Hik_camera_base *s;
+            ~RunningGuard() { s->thread_running_ = false; }
+        } guard{self};
+
         int nRet = MV_OK;
         // ch:获取数据包大小 | en:Get payload size
         MVCC_INTVALUE stParam;
@@ -495,23 +631,181 @@ namespace HIKCAMERA
         if (NULL == pData)
             return NULL;
         unsigned int nDataSize = stParam.nCurValue;
-        while (ros::ok())
+
+        // ========================================
+        // 时间戳标定阶段 (推导 tick 频率 + 标定 offset)
+        // ========================================
         {
-            if (exposure_auto == 0)
+            struct CalibSample
             {
-                // 设置曝光
-                nRet = MV_CC_SetExposureTime(p_handle, exposure_time_set);
-                if (MV_OK != nRet)
+                uint64_t dev_ticks;
+                double wall_sec;
+            };
+            std::vector<CalibSample> samples;
+            int calib_count = self->calib_frame_count_;
+            double iqr_mult = self->calib_iqr_multiplier_;
+            samples.reserve(calib_count);
+
+            ROS_INFO("Timestamp calibration: collecting %d frames...", calib_count);
+            while ((int)samples.size() < calib_count && ros::ok())
+            {
+                nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 200);
+                if (nRet == MV_OK)
                 {
-                    ROS_WARN("Exposure time set failed! nRet [%x]\n", nRet);
+                    CalibSample s;
+                    s.dev_ticks = ((uint64_t)stImageInfo.nDevTimeStampHigh << 32)
+                                | stImageInfo.nDevTimeStampLow;
+                    s.wall_sec  = ros::Time::now().toSec();
+                    samples.push_back(s);
+                }
+                else if (nRet != MV_E_NODATA)
+                {
+                    ROS_WARN("Calibration frame failed, nRet [0x%x]", nRet);
                 }
             }
-            nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 50);
+
+            if ((int)samples.size() < 2)
+            {
+                ROS_ERROR("Timestamp calibration failed: need >=2 frames, got %zu!", samples.size());
+                if (!self->stop_requested_)
+                    self->need_restart_ = true; // 标定失败也应重启, 避免节点僵尸
+                free(pData);
+                free(m_pBufForSaveImage);
+                return NULL;
+            }
+
+            // ---- 第1步: 从帧间 delta 推导 tick 频率 ----
+            // 使用 ros::Time::now() 帧间差 (单位秒)，不依赖 nHostTimeStamp
+            std::vector<double> freq_samples;
+            for (size_t i = 1; i < samples.size(); i++)
+            {
+                int64_t delta_ticks = (int64_t)(samples[i].dev_ticks - samples[i - 1].dev_ticks);
+                double delta_wall = samples[i].wall_sec - samples[i - 1].wall_sec;
+                if (delta_wall > 0.0 && delta_ticks > 0)
+                {
+                    freq_samples.push_back((double)delta_ticks / delta_wall);
+                }
+            }
+
+            if (freq_samples.empty())
+            {
+                ROS_ERROR("Timestamp calibration failed: cannot derive tick frequency!");
+                if (!self->stop_requested_)
+                    self->need_restart_ = true;
+                free(pData);
+                free(m_pBufForSaveImage);
+                return NULL;
+            }
+
+            // IQR 滤波 tick 频率
+            std::sort(freq_samples.begin(), freq_samples.end());
+            {
+                size_t fn = freq_samples.size();
+                double fq1 = freq_samples[fn / 4];
+                double fq3 = freq_samples[3 * fn / 4];
+                double fiqr = fq3 - fq1;
+                double flo = fq1 - iqr_mult * fiqr;
+                double fhi = fq3 + iqr_mult * fiqr;
+                std::vector<double> ffiltered;
+                for (size_t i = 0; i < fn; i++)
+                {
+                    if (freq_samples[i] >= flo && freq_samples[i] <= fhi)
+                        ffiltered.push_back(freq_samples[i]);
+                }
+                self->tick_frequency_ = (int64_t)ffiltered[ffiltered.size() / 2];
+                ROS_INFO("Tick frequency: %ld Hz (from %zu/%zu delta samples, %zu rejected)",
+                         self->tick_frequency_, ffiltered.size(), fn, fn - ffiltered.size());
+            }
+
+            // ---- 第2步: 用推导出的 tick 频率标定 wall clock offset ----
+            std::vector<double> offset_samples;
+            int64_t tick_freq = self->tick_frequency_;
+            for (size_t i = 0; i < samples.size(); i++)
+            {
+                double dev_sec = (double)samples[i].dev_ticks / (double)tick_freq;
+                offset_samples.push_back(samples[i].wall_sec - dev_sec);
+            }
+
+            // IQR 滤波 offset
+            std::sort(offset_samples.begin(), offset_samples.end());
+            size_t on = offset_samples.size();
+            double oq1 = offset_samples[on / 4];
+            double oq3 = offset_samples[3 * on / 4];
+            double oiqr = oq3 - oq1;
+            double olo = oq1 - iqr_mult * oiqr;
+            double ohi = oq3 + iqr_mult * oiqr;
+
+            std::vector<double> ofiltered;
+            for (size_t i = 0; i < on; i++)
+            {
+                if (offset_samples[i] >= olo && offset_samples[i] <= ohi)
+                    ofiltered.push_back(offset_samples[i]);
+            }
+
+            if (ofiltered.empty())
+            {
+                ROS_ERROR("Timestamp calibration failed: all offset samples rejected!");
+                if (!self->stop_requested_)
+                    self->need_restart_ = true;
+                free(pData);
+                free(m_pBufForSaveImage);
+                return NULL;
+            }
+
+            self->device_to_wall_offset_ = ofiltered[ofiltered.size() / 2];
+            self->timestamp_calibrated_ = true;
+
+            // 计算 offset 标准差
+            double sum = 0.0, stddev = 0.0;
+            for (size_t i = 0; i < ofiltered.size(); i++)
+                sum += ofiltered[i];
+            double mean = sum / ofiltered.size();
+            for (size_t i = 0; i < ofiltered.size(); i++)
+                stddev += (ofiltered[i] - mean) * (ofiltered[i] - mean);
+            stddev = sqrt(stddev / ofiltered.size());
+
+            ROS_INFO("Timestamp calibration done: offset=%.6fs, stddev=%.3fms, "
+                     "offset_samples=%zu/%zu (rejected %zu)",
+                     self->device_to_wall_offset_, stddev * 1000.0,
+                     ofiltered.size(), on, on - ofiltered.size());
+        }
+        // ========================================
+        // 标定完毕，开始正常取流
+        // ========================================
+
+        // 取流失败分类与计数：超时容忍并周期告警，真错误累计后退出避免静默死循环
+        static const uint64_t kGrabWarnEveryN = 100;  // 连续超时每 N 次打一条 WARN
+        static const uint64_t kGrabErrBreakN  = 50;   // 连续真错误超过 N 次退出取流
+        uint64_t timeout_cnt = 0;                     // 连续超时计数（取到一帧后清零）
+        uint64_t err_cnt     = 0;                     // 连续真错误计数
+        float last_exposure_set = -1.0f;              // 上次写入相机的曝光值，用于去抖
+
+        while (ros::ok() && !self->stop_requested_)
+        {
+            // 仅当曝光时间实际变化时才写入，避免取流过程中高频调用废弃接口 MV_CC_SetExposureTime
+            if (exposure_auto == 0 && std::fabs(exposure_time_set - last_exposure_set) > 1e-3f)
+            {
+                nRet = MV_CC_SetExposureTime(p_handle, exposure_time_set);
+                if (MV_OK == nRet)
+                {
+                    last_exposure_set = exposure_time_set;
+                }
+                else
+                {
+                    ROS_WARN_STREAM_THROTTLE(5.0, "Exposure time set failed! nRet [0x" << std::hex << nRet << "]");
+                }
+            }
+            nRet = MV_CC_GetOneFrameTimeout(p_handle, pData, nDataSize, &stImageInfo, 1000);
             if (nRet == MV_OK)
             {
-                ros::Time rcv_time = ros::Time::now();
-                // std::string debug_msg;
-                // ROS_INFO_STREAM("GetOneFrame,nFrameNum[" << stImageInfo.nFrameNum << "],FrameTime:" + std::to_string(rcv_time.toSec()));
+                err_cnt = 0;
+                timeout_cnt = 0;
+                // 使用相机设备时间戳（已标定对齐到 PC 时钟）
+                uint64_t dev_ticks = ((uint64_t)stImageInfo.nDevTimeStampHigh << 32)
+                                   | stImageInfo.nDevTimeStampLow;
+                double dev_sec = (double)dev_ticks / (double)self->tick_frequency_;
+                ros::Time capture_time(dev_sec + self->device_to_wall_offset_);
+
                 stConvertParam.nWidth = stImageInfo.nWidth;
                 stConvertParam.nHeight = stImageInfo.nHeight;
                 stConvertParam.pSrcData = pData;
@@ -525,11 +819,46 @@ namespace HIKCAMERA
                 srcImage = cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, m_pBufForSaveImage);
                 sensor_msgs::ImagePtr msg =
                     cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
-                msg->header.stamp = rcv_time;
+                msg->header.stamp = capture_time;
                 pthread_mutex_lock(&mutex);
                 frame_empty = false;
                 frame = msg;
                 pthread_mutex_unlock(&mutex);
+            }
+            else if (nRet == MV_E_NODATA || nRet == MV_E_TIMEOUT)
+            {
+                // 取流超时/无数据：容忍偶发超时，连续累计达阈值则请求重启句柄
+                timeout_cnt++;
+                if (timeout_cnt % kGrabWarnEveryN == 0)
+                {
+                    ROS_WARN_STREAM("Grab timeout/no-data streak: " << timeout_cnt
+                                     << ", last nRet [0x" << std::hex << nRet << "]");
+                }
+                if (self->grab_timeout_retry_threshold_ > 0 &&
+                    timeout_cnt >= (uint64_t)self->grab_timeout_retry_threshold_)
+                {
+                    ROS_ERROR_STREAM("Grab timeout streak " << timeout_cnt
+                                     << " >= threshold " << self->grab_timeout_retry_threshold_
+                                     << ", requesting camera restart.");
+                    self->need_restart_ = true; // 通知主线程重启, 避免节点活但无图
+                    break;
+                }
+                // 偶发超时: continue (下次 MV_OK 会复位 timeout_cnt)
+            }
+            else
+            {
+                // 真错误码：累计后请求重启并退出取流循环，避免线程静默空转死循环
+                err_cnt++;
+                ROS_ERROR_STREAM("Grab failed! nRet [0x" << std::hex << nRet
+                                 << "], streak=" << err_cnt);
+                if (err_cnt >= kGrabErrBreakN)
+                {
+                    ROS_ERROR_STREAM("Grab error streak reached " << kGrabErrBreakN
+                                     << ", requesting restart.");
+                    if (!self->stop_requested_)
+                        self->need_restart_ = true;
+                    break;
+                }
             }
         }
         if (pData)
@@ -547,36 +876,48 @@ namespace HIKCAMERA
 
     void Hik_camera_base::ImagePub()
     {
+        // 临界区内只做 shared_ptr 拷贝与 frame_empty 置位，
+        // publish / cvtColor / mean / 曝光调整等耗时操作移到锁外，避免阻塞 WorkThread 取流。
+        sensor_msgs::ImagePtr local_frame;
+        bool have_frame = false;
         pthread_mutex_lock(&mutex);
         if (frame_empty == false)
         {
-            frame->header.frame_id = camera_name;
-            sensor_msgs::CameraInfoPtr ci_(new sensor_msgs::CameraInfo(cinfo_->getCameraInfo()));
-            ci_->header.frame_id = frame->header.frame_id;
-            ci_->header.stamp = frame->header.stamp;
-            camera_pub.publish(*frame, *ci_);
+            local_frame = frame; // shared_ptr 拷贝，引用计数保证锁外仍有效
             frame_empty = true;
-
-            if (exposure_control)
-            {
-                cv_bridge::CvImagePtr cv_ptr;
-                cv_ptr = cv_bridge::toCvCopy(frame, sensor_msgs::image_encodings::BGR8);
-                cv::Mat temp_img = cv_ptr->image;
-                cv::Mat imgGray;
-                cv::cvtColor(temp_img, imgGray, CV_BGR2GRAY);
-                cv::Scalar grayScalar = cv::mean(imgGray);
-                float imgGrayLight = grayScalar.val[0];
-                if (imgGrayLight < light_set - 10 && exposure_time_set * scale < exposure_time_up)
-                {
-                    exposure_time_set *= scale;
-                }
-                else if (imgGrayLight > light_set + 10 && exposure_time_set / scale > exposure_time_low)
-                {
-                    exposure_time_set /= scale;
-                }
-            }
+            have_frame = true;
         }
         pthread_mutex_unlock(&mutex);
+
+        if (!have_frame)
+        {
+            return;
+        }
+
+        local_frame->header.frame_id = camera_name;
+        sensor_msgs::CameraInfoPtr ci_(new sensor_msgs::CameraInfo(cinfo_->getCameraInfo()));
+        ci_->header.frame_id = local_frame->header.frame_id;
+        ci_->header.stamp = local_frame->header.stamp;
+        camera_pub.publish(*local_frame, *ci_);
+
+        if (exposure_control)
+        {
+            cv_bridge::CvImagePtr cv_ptr;
+            cv_ptr = cv_bridge::toCvCopy(local_frame, sensor_msgs::image_encodings::BGR8);
+            cv::Mat temp_img = cv_ptr->image;
+            cv::Mat imgGray;
+            cv::cvtColor(temp_img, imgGray, CV_BGR2GRAY);
+            cv::Scalar grayScalar = cv::mean(imgGray);
+            float imgGrayLight = grayScalar.val[0];
+            if (imgGrayLight < light_set - 10 && exposure_time_set * scale < exposure_time_up)
+            {
+                exposure_time_set *= scale;
+            }
+            else if (imgGrayLight > light_set + 10 && exposure_time_set / scale > exposure_time_low)
+            {
+                exposure_time_set /= scale;
+            }
+        }
     }
 
 } // namespace HIKCAMERA

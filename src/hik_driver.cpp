@@ -135,10 +135,11 @@ int main(int argc, char **argv)
 #endif
     while (ros::ok())
     {
+        camera.check_and_restart(); // 检测取图超时/失败标志, 按退避策略重启句柄
         camera.ImagePub();
 #ifdef Debug
         i++;
-        if (i % 100 == 0)
+        if (i % 100 == 0 && camera.m_handle != NULL) // 守卫: 重启过程中 m_handle 可能短暂为 NULL
         {
             float gain, exposure_time, FrameRate, gamma, DigitalShift;
             camera.getFloatValue("ExposureTime", exposure_time);

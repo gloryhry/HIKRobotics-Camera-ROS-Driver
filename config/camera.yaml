@@ -1,14 +1,28 @@
 camera_name: camera
 Camera:
   # 相机序列号
-  serial_number: DA5374246
+  serial_number: DB1418166
   # 相机内参文件 package://my_cameras/calibrations/${NAME}.yaml
   cam_info_url: package://hik_camera_driver/config/ost.yaml
   # 帧率
   frame_rate: 10.0
 
+  # 连续取图超时次数阈值（每次 GetOneFrameTimeout 超时 1s）：
+  # 连续达到该次数则重启相机句柄，避免节点活但无图的僵尸状态。
+  # 0 = 禁用；触发模式下自动禁用（无触发信号时超时是正常的）。
+  # 默认 5 ≈ 连续 5s 无数据，GigE 偶发丢包通常 <2s，可避免误重启。
+  grab_timeout_retry: 5
+  # 重启最大尝试次数（0 = 无限，指数退避 1→2→4→8→16→32→60s 封顶）。
+  # 设为正数则超过次数后 ros::shutdown，交给 roslaunch/systemd 拉起。
+  restart_max_retries: 0
+
+  # 时间戳标定帧数（取流后采集N帧计算设备时间与PC时间的偏移，标定期间不发布图像）
+  calib_frame_count: 50
+  # IQR离群值剔除倍数（默认1.5）
+  calib_iqr_multiplier: 1.5
+
   # 触发模式
-  Trigger: true
+  Trigger: false
   # 触发源
   # 0:Line0
   # 1:Line1
@@ -52,7 +66,7 @@ Camera:
 
   # 数字偏移使能
   Digital_shift_mode: true
-  # 数字偏移调节 ≥ 0.0 
+  # 数字偏移调节 ≥ 0.0
   Digital_shift: 3.0
   # 亮度 0 <= L <= 255
   brightneess: 100

@@ -2,7 +2,11 @@
 #define __HIK_CAMERA_DRIVER_CAMERA_H__
 #include <MvCameraControl.h>
 #include <vector>
+#include <cstdint>
+#include <cmath>
+#include <algorithm>
 #include <pthread.h>
+#include <atomic>
 #include <ros/ros.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -39,14 +43,20 @@ namespace HIKCAMERA
         bool getFloatValue(std::string name, float &value);
         bool getStringValue(std::string name, std::string &value);
         bool getIntValue(std::string name, unsigned int &value);
+        bool getIntValueEx(std::string name, int64_t &value);
         bool setFrameRate(float frame_rate);
         bool ImageStream();
         void ImagePub();
         void stopStream();
-        static void *WorkThread(void *p_handle);
+        static void *WorkThread(void *p_user);
+
+        bool restart();            // 取图超时/失败后重建句柄: stopStream + set_camera + set_params + ImageStream
+        void check_and_restart();  // 主循环调用: 检测 need_restart_ 并按退避策略重启
 
         bool changeExposureTime(float value);
         void exposure_callback(const std_msgs::Float32ConstPtr msg);
+
+        bool readTickFrequency();
 
     public:
         int nRet = -1;
@@ -62,6 +72,26 @@ namespace HIKCAMERA
         float exposure_time_up, exposure_time_low; // 曝光时间上下限
         float scale = 1.03;                        // 曝光时间变化率
         float light_set;                           // 控制曝光指定亮度
+
+        // 时间戳标定相关
+        int64_t tick_frequency_ = 0;           // 相机时间戳 tick 频率 (Hz)
+        double device_to_wall_offset_ = 0.0;   // 标定偏移量 (秒)
+        bool timestamp_calibrated_ = false;    // 标定是否完成
+        int calib_frame_count_ = 50;           // 标定帧数
+        double calib_iqr_multiplier_ = 1.5;    // IQR 离群值倍数
+
+        // 取图超时重启相关
+        // WorkThread 写 / 主线程读 (原子)
+        std::atomic<bool> need_restart_{false};   // WorkThread -> 主线程: 请求重启句柄
+        std::atomic<bool> stop_requested_{false}; // 主线程 -> WorkThread: 请求退出
+        std::atomic<bool> thread_running_{false}; // 诊断: WorkThread 是否在运行
+        // 仅主线程访问 (无需原子)
+        bool thread_started_ = false;             // pthread_join 守卫
+        int restart_attempts_ = 0;                // 连续重启失败次数 (退避用)
+        ros::Time last_restart_time_;             // 上次重启时间 (退避用)
+        // 参数
+        int grab_timeout_retry_threshold_ = 5;    // 连续取图超时阈值 (0=禁用)
+        int restart_max_retries_ = 0;             // 重启最大尝试次数 (0=无限, 指数退避封顶 60s)
     };
 
 } // namespace HIKCAMERA
