@@ -48,6 +48,9 @@ namespace HIKCAMERA
         private_nh.param<float>("Camera/Trigger_delay", trigger_delay, 0.0);
         private_nh.param<bool>("Camera/Trigger_cache_enable", trigger_cache, false);
 
+        // 时间戳来源: false=相机硬件时间戳(默认), true=LiDAR 共享内存时间戳 (软同步, 蹭 livox 的 base_time)
+        private_nh.param<bool>("Camera/use_lidar_timestamp", use_lidar_timestamp_, false);
+
         // 取图超时重启参数
         private_nh.param<int>("Camera/grab_timeout_retry", grab_timeout_retry_threshold_, 5);
         private_nh.param<int>("Camera/restart_max_retries", restart_max_retries_, 0);
@@ -440,6 +443,70 @@ namespace HIKCAMERA
         return true;
     }
 
+    // 打开/映射 LiDAR 共享内存时间戳 /home/{user}/timeshare (与 livox_ros_driver2/src/lddc.cpp:172-189 一致)
+    bool Hik_camera_base::openLidarTimestampShm()
+    {
+        // 先清理可能残留的旧映射 (重启路径)
+        closeLidarTimestampShm();
+
+        const char *user_name = getlogin();
+        if (user_name == nullptr)
+        {
+            ROS_WARN("Lidar timestamp: getlogin() failed, fallback to camera HW timestamp.");
+            lidar_shm_ok_ = false;
+            return false;
+        }
+        std::string path_for_time_stamp = "/home/" + std::string(user_name) + "/timeshare";
+        lidar_shm_fd_ = open(path_for_time_stamp.c_str(), O_RDWR);
+        if (lidar_shm_fd_ < 0)
+        {
+            ROS_WARN_STREAM("Lidar timestamp: open(" << path_for_time_stamp
+                            << ") failed (" << errno << "), "
+                            << "ensure livox_ros_driver2 is running; "
+                            << "fallback to camera HW timestamp.");
+            lidar_shm_ok_ = false;
+            return false;
+        }
+        lidar_shm_ptr_ = mmap(nullptr, sizeof(time_stamp),
+                              PROT_READ | PROT_WRITE, MAP_SHARED, lidar_shm_fd_, 0);
+        if (lidar_shm_ptr_ == MAP_FAILED)
+        {
+            ROS_WARN_STREAM("Lidar timestamp: mmap(" << path_for_time_stamp
+                            << ") failed (" << errno << "), "
+                            << "fallback to camera HW timestamp.");
+            close(lidar_shm_fd_);
+            lidar_shm_fd_ = -1;
+            lidar_shm_ptr_ = nullptr;
+            lidar_shm_ok_ = false;
+            return false;
+        }
+        lidar_shm_ok_ = true;
+        ROS_INFO_STREAM("Lidar timestamp: mmap(" << path_for_time_stamp << ") ok, using LiDAR base_time.");
+        return true;
+    }
+
+    void Hik_camera_base::closeLidarTimestampShm()
+    {
+        if (lidar_shm_ptr_ != nullptr && lidar_shm_ptr_ != MAP_FAILED)
+            munmap(lidar_shm_ptr_, sizeof(time_stamp));
+        if (lidar_shm_fd_ >= 0)
+            close(lidar_shm_fd_);
+        lidar_shm_ptr_ = nullptr;
+        lidar_shm_fd_ = -1;
+        lidar_shm_ok_ = false;
+    }
+
+    // 读 pointt->low (纳秒) -> ros::Time (秒); 不可用或未写入返回 ros::Time()
+    ros::Time Hik_camera_base::getLidarTimestamp()
+    {
+        if (!lidar_shm_ok_ || lidar_shm_ptr_ == nullptr || lidar_shm_ptr_ == MAP_FAILED)
+            return ros::Time();
+        int64_t b = reinterpret_cast<time_stamp*>(lidar_shm_ptr_)->low;
+        if (b == 0)  // LiDAR 驱动尚未写入或被清零
+            return ros::Time();
+        return ros::Time(static_cast<double>(b) / 1000000000.0);
+    }
+
     bool Hik_camera_base::ImageStream()
     {
         // 读取标定参数
@@ -447,6 +514,12 @@ namespace HIKCAMERA
         private_nh.param<double>("Camera/calib_iqr_multiplier", calib_iqr_multiplier_, 1.5);
         ROS_INFO("Timestamp calibration: %d frames, IQR multiplier=%.1f (tick freq auto-derived)",
                  calib_frame_count_, calib_iqr_multiplier_);
+
+        // 可选: 启用 LiDAR 共享内存时间戳 (soft-sync, 蹭 livox 的 base_time)
+        if (use_lidar_timestamp_)
+            openLidarTimestampShm();  // 失败不致命, 取流时自动回退到相机硬件时间戳
+        else
+            closeLidarTimestampShm();  // 关闭开关时确保无残留映射
 
         // 重置线程控制标志 (新 WorkThread 可运行, 清除残留重启请求)
         stop_requested_ = false;
@@ -500,6 +573,8 @@ namespace HIKCAMERA
                 ROS_WARN_STREAM("MV_CC_DestroyHandle fail nRet [0x" << std::hex << nRet << "]");
             m_handle = NULL;
         }
+        // 解除 LiDAR 共享内存映射 (配合句柄重建清理, 避免重启时重复 mmap 泄漏)
+        closeLidarTimestampShm();
         thread_running_ = false;
     }
 
@@ -800,11 +875,18 @@ namespace HIKCAMERA
             {
                 err_cnt = 0;
                 timeout_cnt = 0;
-                // 使用相机设备时间戳（已标定对齐到 PC 时钟）
-                uint64_t dev_ticks = ((uint64_t)stImageInfo.nDevTimeStampHigh << 32)
-                                   | stImageInfo.nDevTimeStampLow;
-                double dev_sec = (double)dev_ticks / (double)self->tick_frequency_;
-                ros::Time capture_time(dev_sec + self->device_to_wall_offset_);
+                // 时间戳来源: 优先 LiDAR 共享内存时间戳 (软同步, 蹭 livox 的 base_time);
+                // 未启用/共享内存不可用/LiDAR 尚未写入(capture_time 为零) -> 回退到相机硬件时间戳标定方案
+                ros::Time capture_time;
+                if (self->use_lidar_timestamp_ && self->lidar_shm_ok_)
+                    capture_time = self->getLidarTimestamp();
+                if (capture_time.isZero())
+                {
+                    uint64_t dev_ticks = ((uint64_t)stImageInfo.nDevTimeStampHigh << 32)
+                                       | stImageInfo.nDevTimeStampLow;
+                    double dev_sec = (double)dev_ticks / (double)self->tick_frequency_;
+                    capture_time = ros::Time(dev_sec + self->device_to_wall_offset_);
+                }
 
                 stConvertParam.nWidth = stImageInfo.nWidth;
                 stConvertParam.nHeight = stImageInfo.nHeight;

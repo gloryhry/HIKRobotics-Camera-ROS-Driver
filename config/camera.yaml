@@ -21,6 +21,14 @@ Camera:
   # IQR离群值剔除倍数（默认1.5）
   calib_iqr_multiplier: 1.5
 
+  # 时间戳来源：
+  #   false = 相机硬件时间戳 (默认, 经 tick 频率标定对齐 PC 时钟)
+  #   true  = LiDAR 共享内存时间戳 (软同步, 蹭 livox 驱动写入 /home/{user}/timeshare 的 base_time)
+  # 启用 true 时需保证 livox_ros_driver2 节点已在运行并已创建 timeshare 文件;
+  # 若共享内存不可用或 LiDAR 尚未写入, 自动回退到相机硬件时间戳。
+  # 注意：本参数仅控制 stamp 来源, 与下面的 Trigger (相机采集触发模式) 互不影响。
+  use_lidar_timestamp: false
+
   # 触发模式
   Trigger: false
   # 触发源
@@ -69,7 +77,7 @@ Camera:
   # 数字偏移调节 ≥ 0.0
   Digital_shift: 3.0
   # 亮度 0 <= L <= 255
-  brightneess: 100
+  brightneess: 40
 
   # Gamma 使能
   GammaEnable: true

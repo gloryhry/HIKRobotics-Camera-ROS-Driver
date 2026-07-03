@@ -15,9 +15,14 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <std_msgs/Float32.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 namespace HIKCAMERA
 {
+    // LiDAR 共享内存时间戳结构体 (与 livox_ros_driver2/src/lddc.h:39-42 一致)
+    struct time_stamp { int64_t high; int64_t low; };
     // cv::Mat frame;            // 临时存放当前帧
     extern sensor_msgs::ImagePtr frame; // 临时存放当前帧
     extern pthread_mutex_t mutex;       // 存放帧的锁
@@ -58,6 +63,11 @@ namespace HIKCAMERA
 
         bool readTickFrequency();
 
+        // LiDAR 共享内存时间戳 (可选, 与相机硬件时间戳标定方案并存)
+        bool openLidarTimestampShm();   // 打开/映射 /home/{user}/timeshare
+        void closeLidarTimestampShm();  // 解除映射/关闭 fd (重启与析构时调用)
+        ros::Time getLidarTimestamp();  // 读 pointt->low -> ros::Time, 失败返回 ros::Time()
+
     public:
         int nRet = -1;
         void *m_handle = NULL;
@@ -79,6 +89,12 @@ namespace HIKCAMERA
         bool timestamp_calibrated_ = false;    // 标定是否完成
         int calib_frame_count_ = 50;           // 标定帧数
         double calib_iqr_multiplier_ = 1.5;    // IQR 离群值倍数
+
+        // LiDAR 共享内存时间戳相关 (可选, 与相机硬件时间戳标定方案并存)
+        bool  use_lidar_timestamp_ = false;  // 是否用 LiDAR 共享内存时间戳
+        void *lidar_shm_ptr_ = nullptr;       // mmap 映射的 time_stamp 指针
+        int   lidar_shm_fd_ = -1;            // timeshare 文件描述符
+        bool  lidar_shm_ok_ = false;         // mmap 是否成功
 
         // 取图超时重启相关
         // WorkThread 写 / 主线程读 (原子)
