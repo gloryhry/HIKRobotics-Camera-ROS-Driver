@@ -2,6 +2,11 @@
 
 namespace HIKCAMERA
 {
+    namespace
+    {
+        constexpr char kLidarTimestampPath[] = "/tmp/livox_timeshare";
+    }
+
     sensor_msgs::ImagePtr frame; // 临时存放当前帧
     pthread_mutex_t mutex;       // 存放帧的锁
     bool frame_empty = true;     // 用于标志是否有新帧未发布
@@ -443,24 +448,16 @@ namespace HIKCAMERA
         return true;
     }
 
-    // 打开/映射 LiDAR 共享内存时间戳 /home/{user}/timeshare (与 livox_ros_driver2/src/lddc.cpp:172-189 一致)
+    // 打开/映射 LiDAR 共享内存时间戳 /tmp/livox_timeshare
     bool Hik_camera_base::openLidarTimestampShm()
     {
         // 先清理可能残留的旧映射 (重启路径)
         closeLidarTimestampShm();
 
-        const char *user_name = getlogin();
-        if (user_name == nullptr)
-        {
-            ROS_WARN("Lidar timestamp: getlogin() failed, fallback to camera HW timestamp.");
-            lidar_shm_ok_ = false;
-            return false;
-        }
-        std::string path_for_time_stamp = "/home/" + std::string(user_name) + "/timeshare";
-        lidar_shm_fd_ = open(path_for_time_stamp.c_str(), O_RDWR);
+        lidar_shm_fd_ = open(kLidarTimestampPath, O_RDONLY | O_CLOEXEC);
         if (lidar_shm_fd_ < 0)
         {
-            ROS_WARN_STREAM("Lidar timestamp: open(" << path_for_time_stamp
+            ROS_WARN_STREAM("Lidar timestamp: open(" << kLidarTimestampPath
                             << ") failed (" << errno << "), "
                             << "ensure livox_ros_driver2 is running; "
                             << "fallback to camera HW timestamp.");
@@ -468,10 +465,10 @@ namespace HIKCAMERA
             return false;
         }
         lidar_shm_ptr_ = mmap(nullptr, sizeof(time_stamp),
-                              PROT_READ | PROT_WRITE, MAP_SHARED, lidar_shm_fd_, 0);
+                              PROT_READ, MAP_SHARED, lidar_shm_fd_, 0);
         if (lidar_shm_ptr_ == MAP_FAILED)
         {
-            ROS_WARN_STREAM("Lidar timestamp: mmap(" << path_for_time_stamp
+            ROS_WARN_STREAM("Lidar timestamp: mmap(" << kLidarTimestampPath
                             << ") failed (" << errno << "), "
                             << "fallback to camera HW timestamp.");
             close(lidar_shm_fd_);
@@ -481,7 +478,8 @@ namespace HIKCAMERA
             return false;
         }
         lidar_shm_ok_ = true;
-        ROS_INFO_STREAM("Lidar timestamp: mmap(" << path_for_time_stamp << ") ok, using LiDAR base_time.");
+        ROS_INFO_STREAM("Lidar timestamp: mmap(" << kLidarTimestampPath
+                        << ") ok, using LiDAR base_time.");
         return true;
     }
 

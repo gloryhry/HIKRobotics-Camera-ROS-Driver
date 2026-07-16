@@ -64,7 +64,7 @@ namespace HIKCAMERA
         bool readTickFrequency();
 
         // LiDAR 共享内存时间戳 (可选, 与相机硬件时间戳标定方案并存)
-        bool openLidarTimestampShm();   // 打开/映射 /home/{user}/timeshare
+        bool openLidarTimestampShm();   // 打开/映射 /tmp/livox_timeshare
         void closeLidarTimestampShm();  // 解除映射/关闭 fd (重启与析构时调用)
         ros::Time getLidarTimestamp();  // 读 pointt->low -> ros::Time, 失败返回 ros::Time()
 
