@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <new>
 #include <pthread.h>
 #include <atomic>
 #include <ros/ros.h>
@@ -27,36 +29,32 @@ namespace HIKCAMERA
     extern sensor_msgs::ImagePtr frame; // 临时存放当前帧
     extern pthread_mutex_t mutex;       // 存放帧的锁
     extern bool frame_empty;            // 用于标志是否有新帧未发布
-    extern float exposure_time_set;     // 用于存放下次设置的曝光时间
+    extern std::atomic<float> exposure_time_set; // 用于存放下次设置的曝光时间
     extern int exposure_auto;          // 是否自动曝光
 
     class Hik_camera_base
     {
     public:
         Hik_camera_base(ros::NodeHandle &nh, ros::NodeHandle &private_nh);
-        ~Hik_camera_base(){};
-        bool set_camera(MV_CC_DEVICE_INFO &camera);
+        ~Hik_camera_base();
+        bool set_camera(const MV_CC_DEVICE_INFO &camera);
         bool set_params();
         bool setEnumValue(std::string name, unsigned int value);
         bool setBoolValue(std::string name, bool value);
         bool setFloatValue(std::string name, float value);
         bool setStringValue(std::string name, std::string value);
-        bool setIntValue(std::string name, unsigned int value);
+        bool setIntValue(std::string name, int64_t value);
         bool setCommandValue(std::string name);
         bool getEnumValue(std::string name, MVCC_ENUMVALUE &value);
         bool getBoolValue(std::string name, bool &value);
         bool getFloatValue(std::string name, float &value);
         bool getStringValue(std::string name, std::string &value);
-        bool getIntValue(std::string name, unsigned int &value);
-        bool getIntValueEx(std::string name, int64_t &value);
+        bool getIntValue(std::string name, int64_t &value);
         bool setFrameRate(float frame_rate);
         bool ImageStream();
         void ImagePub();
         void stopStream();
         static void *WorkThread(void *p_user);
-
-        bool restart();            // 取图超时/失败后重建句柄: stopStream + set_camera + set_params + ImageStream
-        void check_and_restart();  // 主循环调用: 检测 need_restart_ 并按退避策略重启
 
         bool changeExposureTime(float value);
         void exposure_callback(const std_msgs::Float32ConstPtr msg);
@@ -65,7 +63,7 @@ namespace HIKCAMERA
 
         // LiDAR 共享内存时间戳 (可选, 与相机硬件时间戳标定方案并存)
         bool openLidarTimestampShm();   // 打开/映射 /tmp/livox_timeshare
-        void closeLidarTimestampShm();  // 解除映射/关闭 fd (重启与析构时调用)
+        void closeLidarTimestampShm();  // 解除映射/关闭 fd
         ros::Time getLidarTimestamp();  // 读 pointt->low -> ros::Time, 失败返回 ros::Time()
 
     public:
@@ -80,6 +78,9 @@ namespace HIKCAMERA
         ros::Subscriber exposure_sub;
         bool exposure_control = false;             // 程序控制曝光（当外部触发,无法使用自动曝光时启用）
         float exposure_time_up, exposure_time_low; // 曝光时间上下限
+        float exposure_time_sdk_min_ = 0.0f;        // SDK ExposureTime 最小值
+        float exposure_time_sdk_max_ = 0.0f;        // SDK ExposureTime 最大值
+        bool exposure_time_range_ready_ = false;    // 曝光范围是否已读取并校验
         float scale = 1.03;                        // 曝光时间变化率
         float light_set;                           // 控制曝光指定亮度
 
@@ -96,18 +97,11 @@ namespace HIKCAMERA
         int   lidar_shm_fd_ = -1;            // timeshare 文件描述符
         bool  lidar_shm_ok_ = false;         // mmap 是否成功
 
-        // 取图超时重启相关
-        // WorkThread 写 / 主线程读 (原子)
-        std::atomic<bool> need_restart_{false};   // WorkThread -> 主线程: 请求重启句柄
+        // 取流线程生命周期
         std::atomic<bool> stop_requested_{false}; // 主线程 -> WorkThread: 请求退出
-        std::atomic<bool> thread_running_{false}; // 诊断: WorkThread 是否在运行
-        // 仅主线程访问 (无需原子)
+        bool device_open_ = false;                 // OpenDevice/CloseDevice 状态
+        bool grabbing_ = false;                    // StartGrabbing/StopGrabbing 状态
         bool thread_started_ = false;             // pthread_join 守卫
-        int restart_attempts_ = 0;                // 连续重启失败次数 (退避用)
-        ros::Time last_restart_time_;             // 上次重启时间 (退避用)
-        // 参数
-        int grab_timeout_retry_threshold_ = 5;    // 连续取图超时阈值 (0=禁用)
-        int restart_max_retries_ = 0;             // 重启最大尝试次数 (0=无限, 指数退避封顶 60s)
     };
 
 } // namespace HIKCAMERA

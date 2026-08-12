@@ -10,9 +10,7 @@
 std::vector<MV_CC_DEVICE_INFO> get_all_camera()
 {
     std::vector<MV_CC_DEVICE_INFO> cameras;
-    cameras.clear();
     int nRet = -1;
-    void *m_handle = NULL;
     unsigned int nTLayerType = MV_GIGE_DEVICE | MV_USB_DEVICE;
     MV_CC_DEVICE_INFO_LIST m_stDevList = {0};
     nRet = MV_CC_EnumDevices(nTLayerType, &m_stDevList);
@@ -21,7 +19,6 @@ std::vector<MV_CC_DEVICE_INFO> get_all_camera()
         ROS_ERROR_STREAM("error: EnumDevices fail: " << nRet);
         return cameras;
     }
-    int i = 0;
     if (m_stDevList.nDeviceNum == 0)
     {
         ROS_WARN_STREAM("No camera found!");
@@ -83,51 +80,78 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "hik_driver");
     ros::NodeHandle nh, private_nh("~");
+
+    const unsigned int sdk_version = MV_CC_GetSDKVersion();
+    ROS_INFO("MVS SDK version: %u.%u.%u.%u (0x%08x)",
+             (sdk_version >> 24) & 0xff,
+             (sdk_version >> 16) & 0xff,
+             (sdk_version >> 8) & 0xff,
+             sdk_version & 0xff,
+             sdk_version);
+
     std::vector<MV_CC_DEVICE_INFO> cameras;
     cameras = get_all_camera();
     if (cameras.size() == 0)
     {
-        return EXIT_SUCCESS;
+        return EXIT_FAILURE;
     }
 
     std::string serial_number;
     private_nh.param<std::string>("Camera/serial_number", serial_number, "00DA1999130");
 
     HIKCAMERA::Hik_camera_base camera(nh, private_nh);
+    const MV_CC_DEVICE_INFO *selected_camera = NULL;
     if (serial_number == "")
     {
-        camera.set_camera(cameras[0]);
+        selected_camera = &cameras[0];
     }
     else
     {
-        bool flag = false;
         for (auto &temp : cameras)
         {
-            char *temp_serial_number;
+            const char *temp_serial_number = NULL;
             if (temp.nTLayerType == MV_GIGE_DEVICE)
             {
-                temp_serial_number = (char *)temp.SpecialInfo.stGigEInfo.chSerialNumber;
+                temp_serial_number = reinterpret_cast<const char *>(
+                    temp.SpecialInfo.stGigEInfo.chSerialNumber);
             }
             else if (temp.nTLayerType == MV_USB_DEVICE)
             {
-                temp_serial_number = (char *)temp.SpecialInfo.stUsb3VInfo.chSerialNumber;
+                temp_serial_number = reinterpret_cast<const char *>(
+                    temp.SpecialInfo.stUsb3VInfo.chSerialNumber);
             }
+            if (temp_serial_number == NULL)
+                continue;
             std::string string_serial_number = temp_serial_number;
             if (string_serial_number == serial_number)
             {
-                camera.set_camera(temp);
-                flag = true;
+                selected_camera = &temp;
                 break;
             }
         }
-        if (!flag)
+        if (selected_camera == NULL)
         {
             ROS_ERROR_STREAM("Can Not Find Camera: " << serial_number);
-            return EXIT_SUCCESS;
+            return EXIT_FAILURE;
         }
     }
-    camera.set_params();
-    camera.ImageStream();
+    if (!camera.set_camera(*selected_camera))
+    {
+        ROS_ERROR_STREAM("Camera open failed.");
+        return EXIT_FAILURE;
+    }
+    if (!camera.set_params())
+    {
+        ROS_ERROR_STREAM("Camera parameter configuration failed.");
+        camera.stopStream();
+        return EXIT_FAILURE;
+    }
+    if (!camera.ImageStream())
+    {
+        ROS_ERROR_STREAM("Camera stream startup failed.");
+        camera.stopStream();
+        return EXIT_FAILURE;
+    }
 
     ros::Rate rate(100);
 #ifdef Debug
@@ -135,11 +159,10 @@ int main(int argc, char **argv)
 #endif
     while (ros::ok())
     {
-        camera.check_and_restart(); // 检测取图超时/失败标志, 按退避策略重启句柄
         camera.ImagePub();
 #ifdef Debug
         i++;
-        if (i % 100 == 0 && camera.m_handle != NULL) // 守卫: 重启过程中 m_handle 可能短暂为 NULL
+        if (i % 100 == 0 && camera.m_handle != NULL)
         {
             float gain, exposure_time, FrameRate, gamma, DigitalShift;
             camera.getFloatValue("ExposureTime", exposure_time);

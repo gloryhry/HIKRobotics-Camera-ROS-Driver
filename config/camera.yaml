@@ -7,15 +7,6 @@ Camera:
   # 帧率
   frame_rate: 10.0
 
-  # 连续取图超时次数阈值（每次 GetOneFrameTimeout 超时 1s）：
-  # 连续达到该次数则重启相机句柄，避免节点活但无图的僵尸状态。
-  # 0 = 禁用；触发模式下自动禁用（无触发信号时超时是正常的）。
-  # 默认 5 ≈ 连续 5s 无数据，GigE 偶发丢包通常 <2s，可避免误重启。
-  grab_timeout_retry: 5
-  # 重启最大尝试次数（0 = 无限，指数退避 1→2→4→8→16→32→60s 封顶）。
-  # 设为正数则超过次数后 ros::shutdown，交给 roslaunch/systemd 拉起。
-  restart_max_retries: 0
-
   # 时间戳标定帧数（取流后采集N帧计算设备时间与PC时间的偏移，标定期间不发布图像）
   calib_frame_count: 50
   # IQR离群值剔除倍数（默认1.5）
@@ -23,14 +14,14 @@ Camera:
 
   # 时间戳来源：
   #   false = 相机硬件时间戳 (默认, 经 tick 频率标定对齐 PC 时钟)
-  #   true  = LiDAR 共享内存时间戳 (软同步, 蹭 livox 驱动写入 /home/{user}/timeshare 的 base_time)
+  #   true  = LiDAR 共享内存时间戳 (软同步, 蹭 livox 驱动写入 /tmp/livox_timeshare 的 base_time)
   # 启用 true 时需保证 livox_ros_driver2 节点已在运行并已创建 timeshare 文件;
   # 若共享内存不可用或 LiDAR 尚未写入, 自动回退到相机硬件时间戳。
   # 注意：本参数仅控制 stamp 来源, 与下面的 Trigger (相机采集触发模式) 互不影响。
   use_lidar_timestamp: false
 
   # 触发模式
-  Trigger: false
+  Trigger: true
   # 触发源
   # 0:Line0
   # 1:Line1
@@ -77,7 +68,7 @@ Camera:
   # 数字偏移调节 ≥ 0.0
   Digital_shift: 3.0
   # 亮度 0 <= L <= 255
-  brightneess: 40
+  brightneess: 70
 
   # Gamma 使能
   GammaEnable: true
